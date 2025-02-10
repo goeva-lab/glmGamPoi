@@ -99,6 +99,21 @@ test_that("NA's don't mess up the results", {
   expect_equal(SummarizedExperiment::colData(psce)$fav_food, unique(SummarizedExperiment::colData(sce)$fav_food))
 })
 
+test_that("matrix columns don't cause trouble", {
+  suppressWarnings({
+    data <- data.frame(fav_food = sample(c("apple", "banana", "cherry"), size = 50, replace = TRUE),
+                       mat_column = I(matrix(1:12, nrow = 50, ncol = 3, byrow = TRUE)))
+  })
+  Y <- matrix(rnbinom(n = 100 * 50, mu = 3, size = 1/3.1), nrow = 100, ncol = 50)
+  rownames(Y) <- paste0("gene_", seq_len(100))
+  colnames(Y) <- paste0("cell_", seq_len(50))
+
+  psce <- pseudobulk(Y, group_by = vars(fav_food, mat_column), col_data = data)
+  expect_equal(ncol(psce), 12)
+  expect_type(SingleCellExperiment::colData(psce)[[1]], "character")
+  expect_true(is.matrix(SingleCellExperiment::colData(psce)[[2]]))
+})
+
 
 # Compare speed of complex aggregation with smart_subsetting
 # mat <-  as(matrix(rpois(n = 1000 * 1e5, lambda = 0.1), nrow = 1000, ncol = 1e5), "dgCMatrix")

@@ -59,11 +59,12 @@ pseudobulk <- function(data, group_by, ...,
 
   # Make vector that is used to
   groups <- lapply(group_by, rlang::eval_tidy, data = col_data)
-  if(! all(lengths(groups) == 1 | lengths(groups) == ncol(data))){
-    stop("The argument 'group_by' has lengths ", paste0(lengths(groups), collapse = ","), ", which does not match the number of columns ",
+  group_lengths <- vctrs::list_sizes(groups)
+  if(! all(group_lengths == 1 | group_lengths == ncol(data))){
+    stop("The argument 'group_by' has lengths ", paste0(group_lengths, collapse = ","), ", which does not match the number of columns ",
          "in 'data' (", ncol(data), ")")
-  }else if(any(lengths(groups) == 1)){
-    groups[lengths(groups) == 1] <- lapply(groups[lengths(groups) == 1], \(x) rep_len(x, ncol(data)))
+  }else if(any(group_lengths == 1)){
+    groups[group_lengths == 1] <- lapply(groups[group_lengths == 1], \(x) rep_len(x, ncol(data)))
   }
 
   if(is.null(groups)){
@@ -72,7 +73,13 @@ pseudobulk <- function(data, group_by, ...,
     split_res <- vctrs::vec_group_loc(as.data.frame(groups))
     group_split <- split_res$loc
     if(make_colnames){
-      names(group_split) <- do.call(paste, c(split_res$key, sep = "."))
+      split_res_key <- split_res$key
+      row_names <- character(nrow(split_res_key))
+      for(idx in seq_len(nrow(split_res_key))){
+        row_names[idx] <- paste0(vapply(split_res_key[idx,,drop=FALSE], function(x) paste0(as.character(x), collapse = "."), FUN.VALUE = character(1L)),
+                                 collapse = ".")
+      }
+      names(group_split) <- row_names
     }
   }
 
