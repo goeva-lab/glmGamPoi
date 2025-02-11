@@ -22,7 +22,7 @@ glm_gp(
 )
 }
 \arguments{
-\item{data}{any matrix-like object (e.g. \link{matrix}, \link{DelayedArray}, \link{HDF5Matrix}) or
+\item{data}{any matrix-like object (e.g. \link{matrix}, sparse matrix (\link{dgCMatrix}), \link{DelayedArray}, \link{HDF5Matrix}) or
 anything that can be cast to a \link{SummarizedExperiment} (e.g. \code{MSnSet}, \code{eSet} etc.) with
 one column per sample and row per gene.}
 
@@ -46,8 +46,7 @@ Default: \code{NULL}.}
 
 \item{offset}{Constant offset in the model in addition to \code{log(size_factors)}. It can
 either be a single number, a vector of length \code{ncol(data)} or a matrix with the
-same dimensions as \code{dim(data)}. Note that if data is a \link{DelayedArray} or \link{HDF5Matrix},
-\code{offset} must be as well. Default: \code{0}.}
+same dimensions as \code{dim(data)}. Default: \code{0}.}
 
 \item{size_factors}{in large scale experiments, each sample is typically of different size
 (for example different sequencing depths). A size factor is an internal mechanism of GLMs to

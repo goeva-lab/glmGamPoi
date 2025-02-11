@@ -8,7 +8,7 @@
 #' automatically determines the appropriate size factors for each sample and efficiently
 #' finds the best overdispersion parameter for each gene.
 #'
-#' @param data any matrix-like object (e.g. [matrix], [DelayedArray], [HDF5Matrix]) or
+#' @param data any matrix-like object (e.g. [matrix], sparse matrix ([dgCMatrix]), [DelayedArray], [HDF5Matrix]) or
 #'   anything that can be cast to a [SummarizedExperiment] (e.g. `MSnSet`, `eSet` etc.) with
 #'   one column per sample and row per gene.
 #' @param design a specification of the experimental design used to fit the Gamma-Poisson GLM.
@@ -28,8 +28,7 @@
 #'   Default: `NULL`.
 #' @param offset Constant offset in the model in addition to `log(size_factors)`. It can
 #'   either be a single number, a vector of length `ncol(data)` or a matrix with the
-#'   same dimensions as `dim(data)`. Note that if data is a [DelayedArray] or [HDF5Matrix],
-#'   `offset` must be as well. Default: `0`.
+#'   same dimensions as `dim(data)`. Default: `0`.
 #' @param size_factors in large scale experiments, each sample is typically of different size
 #'   (for example different sequencing depths). A size factor is an internal mechanism of GLMs to
 #'   correct for this effect.\cr
@@ -290,8 +289,8 @@ glm_gp <- function(data,
 
 
 handle_data_parameter <- function(data, use_assay, on_disk, verbose = FALSE){
-  if(is.matrix(data)){
-    if(! is.numeric(data)){
+  if(is.matrix(data) || is(data, "dgCMatrix")){
+    if(is.matrix(data) && ! is.numeric(data)){
       stop("The data argument must consist of numeric values and not of ", mode(data), " values")
     }
     if(is.null(on_disk) || isFALSE(on_disk)){
@@ -348,9 +347,7 @@ handle_data_parameter <- function(data, use_assay, on_disk, verbose = FALSE){
     }else if(isFALSE(on_disk)){
       data_mat <- as.matrix(data)
     }else{
-      stop("glmGamPoi does not yet support sparse input data of type '", class(data),"'. ",
-           "Please explicitly set the 'on_disk' parameter to force a conversion to a dense format either in-memory ('on_disk = FALSE') ",
-           "or on-disk ('on_disk = TRUE')")
+      data_mat <- as(data, "CsparseMatrix")
     }
   }else{
     stop("Cannot handle data of class '", class(data), "'.",

@@ -94,6 +94,12 @@ test_that("combine_size_factors_and_offset works", {
   expect_equal(off_and_sf$offset_matrix[1,], log(est_sf))
   expect_is(off_and_sf$offset_matrix, "matrix")
 
+  delayed_mat <- DelayedArray::DelayedArray(mat)
+  off_and_sf <- combine_size_factors_and_offset(offset_num, sf3, delayed_mat)
+  expect_equal(off_and_sf$size_factors, est_sf)
+  expect_equal(off_and_sf$offset_matrix[1,], log(est_sf))
+  expect_is(off_and_sf$offset_matrix, "DelayedMatrix")
+
   library(HDF5Array)
   hdf5_mat <- as(mat, "HDF5Matrix")
   off_and_sf <- combine_size_factors_and_offset(offset_num, sf3, hdf5_mat)

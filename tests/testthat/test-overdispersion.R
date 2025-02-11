@@ -291,7 +291,7 @@ test_that("DelayedArrays are handled efficiently", {
   model_matrix <- matrix(1, nrow = n_samples, ncol = 1)
   mat <- matrix(seq_len(n_genes * n_samples), nrow = n_genes, ncol = n_samples)
   mat_hdf5 <-  as(mat, "HDF5Matrix")
-  offset_matrix <- combine_size_factors_and_offset(TRUE, 1, mat_hdf5)$offset_matrix
+  offset_matrix <- combine_size_factors_and_offset(0, 1, mat_hdf5)$offset_matrix
   dispersions <- estimate_dispersions_roughly(mat_hdf5, model_matrix, offset_matrix)
 
   beta_vec_init <- estimate_betas_roughly_group_wise(mat_hdf5, offset_matrix, groups = 1)

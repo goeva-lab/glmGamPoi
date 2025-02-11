@@ -77,26 +77,32 @@ combine_size_factors_and_offset <- function(offset, size_factors, Y, verbose = F
   n_genes <- nrow(Y)
   n_samples <- ncol(Y)
 
-  make_offset_hdf5_mat <- is(Y, "DelayedMatrix") && is(DelayedArray::seed(Y), "HDF5ArraySeed")
   zero_offset <- TRUE
+  make_offset_hdf5_mat <- is(Y, "DelayedMatrix") && is(DelayedArray::seed(Y), "HDF5ArraySeed")
+  make_offset_delayed_mat <- is(Y, "DelayedMatrix")
 
-  if(is.matrix(offset)){
+  if(is.numeric(offset) && ! is.matrix(offset) && (make_offset_hdf5_mat || is(Y, "DelayedMatrix"))){
+    zero_offset <- all(offset == 0)
+    offset_matrix <-if(length(offset) == 1){
+      DelayedArray::ConstantArray(c(n_genes, n_samples), value = offset)
+    }else if(length(offset) == n_samples){
+      DelayedArray::RleArray(S4Vectors::Rle(offset, lengths = n_genes), dim = c(n_genes, n_samples))
+    }else{
+      stop("'offset' is a vector. Its length must either be 1 or match the number of samples (", n_samples, ").")
+    }
+  }else if(is.numeric(offset) && ! is.matrix(offset)){
+    if(length(offset) != 1 && length(offset) != n_samples){
+      stop("'offset' is a vector. Its length must either be 1 or match the number of samples (", n_samples, ").")
+    }
+    offset_matrix <- matrix(offset, nrow=n_genes, ncol = n_samples, byrow = TRUE)
+  }else if(is.matrix(offset) || is(offset, "DelayedMatrix")){
     stopifnot(dim(offset) == c(n_genes, n_samples))
-    offset_matrix <- offset
-  }else if(is(offset, "HDF5Matrix")){
-    stopifnot(dim(offset) == c(n_genes, n_samples))
-    stopifnot(make_offset_hdf5_mat)
     offset_matrix <- offset
   }else{
-    stopifnot(length(offset) == 1 || length(offset) == n_samples)
-    zero_offset <- all(offset == 0)
-    if(make_offset_hdf5_mat){
-      offset_matrix <- DelayedArray::DelayedArray(SparseArray::COO_SparseArray(c(n_genes, n_samples)))
-      offset_matrix <- add_vector_to_each_row(offset_matrix, offset)
-    }else{
-      offset_matrix <- matrix(offset, nrow=n_genes, ncol = n_samples, byrow = TRUE)
-    }
+    stop("'offset' is of type ", class(offset)[1], ", which is not supported.")
   }
+
+
   if(isTRUE(size_factors) || is.character(size_factors)){
     if(! zero_offset){
       warning("The offset is non zero, nonetheless an additional size factor is estimated. The effective 'offset' is thus 'offset + log(size_factor)'.\n",
@@ -132,8 +138,10 @@ combine_size_factors_and_offset <- function(offset, size_factors, Y, verbose = F
   }
   # offset_matrix <- offset_matrix + lsf_mat
   offset_matrix <- add_vector_to_each_row(offset_matrix, lsf)
-  if(make_offset_hdf5_mat){
+  if(make_offset_hdf5_mat && ! is(offset_matrix, "HDF5Array")){
     offset_matrix <- HDF5Array::writeHDF5Array(offset_matrix)
+  }else if(make_offset_delayed_mat && ! is(offset_matrix, "DelayedArray")){
+    offset_matrix <- DelayedArray::DelayedArray(offset_matrix)
   }
   list(offset_matrix = offset_matrix, size_factors = exp(lsf))
 }

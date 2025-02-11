@@ -32,7 +32,7 @@ glm_gp_impl <- function(Y, model_matrix,
     Y <- matrix(Y, nrow = 1)
   }
   # Error conditions
-  stopifnot(is.matrix(Y) || is(Y, "DelayedArray"))
+  stopifnot(is.matrix(Y) || is(Y, "DelayedMatrix") || is(Y, "Matrix"))
   stopifnot(is.matrix(model_matrix) && nrow(model_matrix) == ncol(Y))
   validate_Y_matrix(Y)
   subsample <- handle_subsample_parameter(Y, subsample)
@@ -42,6 +42,11 @@ glm_gp_impl <- function(Y, model_matrix,
   off_and_sf <- combine_size_factors_and_offset(offset, size_factors, Y, verbose = verbose)
   offset_matrix <- off_and_sf$offset_matrix
   size_factors <- off_and_sf$size_factors
+  if(is(offset_matrix, "DelayedMatrix") && ! is(Y, "DelayedMatrix")){
+    # 'offset_matrix' is a DelayedArray and 'Y' is not. I will wrap 'Y' in a DelayedArray to avoid problems
+    # This does not affect the output object
+    Y <- DelayedArray::DelayedArray(Y)
+  }
 
   # Check if there distinct groups in model matrix
   # returns NULL if there would be more groups than columns
