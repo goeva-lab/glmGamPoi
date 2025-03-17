@@ -65,6 +65,12 @@ add_vector_to_each_column <- function(matrix, vector){
 
 add_vector_to_each_row <- function(matrix, vector){
   stopifnot(length(vector) == 1 || length(vector) == ncol(matrix))
+
+  # This is a work-around for https://github.com/Bioconductor/DelayedArray/issues/123
+  if(is(matrix, "ConstantMatrix") && all(matrix == 0)){
+    return(matrix(vector, nrow = nrow(matrix), ncol = ncol(matrix), byrow = TRUE))
+  }
+
   if(length(vector) == 1){
     matrix + vector
   }else{
