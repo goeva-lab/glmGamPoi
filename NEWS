@@ -6,6 +6,7 @@ One important change is that glmGamPoi now requires C++17 (instead of C++14).
 + The input data can be sparse! Building on top of tatami allows me to support arbitrary
 matrix types such as sparse matrices and DelayedArrays.
 + Fix bug regarding matrix columns in `pseudobulk` (https://github.com/const-ae/lemur/issues/20).
++ Add work-around for https://github.com/Bioconductor/DelayedArray/issues/123
 
 Version 1.17 (2024-05-29)
 + `test_de` can now compute the standard error of the log2-fold change
