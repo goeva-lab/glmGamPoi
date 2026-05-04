@@ -1,5 +1,3 @@
-
-
 #' Fit a Gamma-Poisson Generalized Linear Model
 #'
 #' This function provides a simple to use interface to fit Gamma-Poisson generalized
@@ -8,7 +6,7 @@
 #' automatically determines the appropriate size factors for each sample and efficiently
 #' finds the best overdispersion parameter for each gene.
 #'
-#' @param data any matrix-like object (e.g. [matrix], sparse matrix ([dgCMatrix]), [DelayedArray], [HDF5Matrix]) or
+#' @param data any matrix-like object (e.g. [matrix], sparse matrix ([dgCMatrix][Matrix::dgCMatrix-class]), [DelayedArray], [HDF5Matrix]) or
 #'   anything that can be cast to a [SummarizedExperiment] (e.g. `MSnSet`, `eSet` etc.) with
 #'   one column per sample and row per gene.
 #' @param design a specification of the experimental design used to fit the Gamma-Poisson GLM.
@@ -89,6 +87,19 @@
 #'   to reduce the memory usage. Processing in memory can be significantly faster than on disk.
 #'   Default: `NULL` which means that the data is only processed in memory if `data` is an in-memory
 #'   data structure.
+#' @param mem_optim a value that indicates if attempts should be made to optimize memory use while fitting the GLM.
+#'   Can be provided as a boolean (turns on/off all optimizations) or as a list to select only specific optimizations.
+#'   Note: various optimizations here can lead to BREAKING changes in output shape and/or values,
+#'   and were designed/intended for application on single-cell transcriptomics data (e.g. sparse matrix, with l.t. ~10% density)
+#'   A list of currently specified optimizations is provided below:
+#'   \itemize{
+#'     \item `offset_as_vec`: if `offset` is provided as either a constant or a vector of per-sample offsets,
+#'       `Offset` will be a vector instead of a matrix to avoid generating a dense n_sample * n_genes matrix
+#'     \item `mu_dropout_thresh`: if set to a numeric-like value greater than zero and `offset_as_vec` is enabled,
+#'        then during `Mu` (prediction) matrix construction, values less than `mu_dropout_thresh` will
+#'        be replaced with zeroes, and `Mu` will be constructed as a [dgCMatrix][Matrix::dgCMatrix-class]
+#'   }
+#'   Default: `FALSE`, meaning no optimizations are made
 #' @param verbose a boolean that indicates if information about the individual steps are printed
 #'   while fitting the GLM. Default: `FALSE`.
 #'
@@ -228,6 +239,7 @@ glm_gp <- function(data,
                    subsample = FALSE,
                    on_disk = NULL,
                    use_assay = NULL,
+                   mem_optim = FALSE,
                    verbose = FALSE){
 
   # Validate `data`
@@ -249,6 +261,8 @@ glm_gp <- function(data,
   col_data <- get_col_data(data, col_data)
   des <- handle_design_parameter(design, data, col_data, reference_level)
 
+  mem_optim <- handle_memoptim_parameter(mem_optim)
+
   # Call glm_gp_impl()
   res <- glm_gp_impl(data_mat,
               model_matrix = des$model_matrix,
@@ -259,6 +273,7 @@ glm_gp <- function(data,
               ridge_penalty = ridge_penalty,
               do_cox_reid_adjustment = do_cox_reid_adjustment,
               subsample = subsample,
+              mem_optim = mem_optim,
               verbose = verbose)
   # Make sure that the output is nice and beautiful
   rownames(data_mat) <- rownames(data)
@@ -277,11 +292,17 @@ glm_gp <- function(data,
   }
   rownames(res$Mu) <- rownames(data)
   colnames(res$Mu) <- colnames(data)
-  rownames(res$Offset) <- rownames(data)
-  colnames(res$Offset) <- colnames(data)
+  if(is.vector(res$Offset, mode = "numeric")){
+    names(res$Offset) <- colnames(data)
+  }else{
+    rownames(res$Offset) <- rownames(data)
+    colnames(res$Offset) <- colnames(data)
+  }
   names(res$overdispersions) <- rownames(data)
   names(res$deviances) <- rownames(data)
   names(res$size_factors) <- colnames(data)
+
+  attr(res, "mem_optim") <- mem_optim
 
   class(res) <- "glmGamPoi"
   res

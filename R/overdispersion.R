@@ -173,7 +173,7 @@ conventional_overdispersion_mle <- function(y, mean_vector,
                                        model_matrix = matrix(1, nrow = length(y), ncol = 1),
                                        do_cox_reid_adjustment = TRUE, max_iter = 200,
                                        verbose = FALSE){
-  return_value = list(estimate = NA_real_, iterations = NA_real_, message = "")
+  return_value <- list(estimate = NA_real_, iterations = NA_real_, message = "")
 
   tab <- make_table_if_small(y, stop_if_larger = length(y)/2)
 
@@ -271,7 +271,12 @@ estimate_global_overdispersion <- function(Y, Mu, model_matrix, do_cox_reid_adju
 
 
 estimate_dispersions_by_moment <- function(Y, model_matrix, offset_matrix){
-  xim <- 1/mean(DelayedMatrixStats::colMeans2(exp(offset_matrix)))
+  # detect case of memory optimization
+  if(is.vector(offset_matrix, mode = "numeric")){
+    xim <- 1/mean(exp(offset_matrix))
+  }else{
+    xim <- 1/mean(DelayedMatrixStats::colMeans2(exp(offset_matrix)))
+  }
   bv <- DelayedMatrixStats::rowVars(Y)
   bm <- DelayedMatrixStats::rowMeans2(Y)
   (bv - xim * bm) / bm^2

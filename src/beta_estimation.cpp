@@ -168,8 +168,82 @@ double decrease_deviance_plus_ridge(/*In-Out Parameter*/ arma::vec& beta_hat,
   return dev;
 }
 
+// Oracle sub-class which just always fetches a compile-time constant index
+template <int IndexValue>
+class ConstIndexOracle final : public tatami::Oracle<int> {
+public:
+  ConstIndexOracle(const int length) : my_length(sanisizer::cast<tatami::PredictionIndex>(length)) {}
+  tatami::PredictionIndex total() const { return my_length; }
+  int get(tatami::PredictionIndex i) const { return IndexValue; }
+private:
+  tatami::PredictionIndex my_length;
+};
 
+template<class VecType>
+void fitBeta_FS_internal_loop(/* in-out parameter */ arma::mat &beta_mat,
+                              /* in-out parameter */ VecType &deviance,
+                              /* in-out parameter */ VecType &iterations,
+                              size_t gene_idx, int n_samples, 
+                              const arma::Col<double> &counts, const arma::Col<double> &exp_off, const arma::mat &model_matrix,
+                              bool apply_ridge_penalty, const arma::vec &ridge_target, const arma::mat &ridge_penalty, const arma::mat &ridge_penalty_sq,
+                              double theta, double tolerance, double max_rel_mu_change, int max_iter, bool use_diagonal_approx) {
+  // Init beta and mu
+  arma::vec beta_hat = beta_mat.row(gene_idx).t();
+  arma::vec mu_hat = calculate_mu(model_matrix, beta_hat, exp_off);
+  if (beta_hat.has_nan() || Rcpp::traits::is_na<REALSXP>(theta)){
+    beta_hat.fill(NA_REAL);
+    iterations[gene_idx] = 0;
+    deviance[gene_idx] = NA_REAL;
+    return;
+  }
+  // Init deviance
+  double dev_old = 0;
+  if (apply_ridge_penalty){
+    // For diagonal ridge_penalty: pen = Sum (lambda_i b_i)^2
+    double pen_sum = n_samples * arma::as_scalar((beta_hat - ridge_target).t() * ridge_penalty_sq * (beta_hat - ridge_target));
+    dev_old = compute_gp_deviance_sum(counts, mu_hat, theta) + pen_sum;
+  }else{
+    dev_old = compute_gp_deviance_sum(counts, mu_hat, theta);
+  }
 
+  for (int t = 0; t < max_iter; t++){
+    iterations[gene_idx]++;
+    // Find good direction to optimize beta
+    arma::vec step;
+    if (use_diagonal_approx){
+      step = fisher_scoring_diagonal_step(model_matrix, counts, mu_hat, theta * mu_hat);
+    }else{
+      if (apply_ridge_penalty){
+        step = fisher_scoring_qr_ridge_step(model_matrix, counts, mu_hat, theta * mu_hat, ridge_penalty, ridge_target, beta_hat);
+      }else{
+        step = fisher_scoring_qr_step(model_matrix, counts, mu_hat, theta * mu_hat);
+      }
+    }
+    // Find step size that actually decreases the deviance
+    double dev = 0;
+    if (apply_ridge_penalty){
+      dev = decrease_deviance_plus_ridge(beta_hat, mu_hat, step, model_matrix, ridge_penalty_sq, ridge_target,
+                                         exp_off, counts, theta, dev_old, tolerance, max_rel_mu_change);
+    }else{
+      dev = decrease_deviance(beta_hat, mu_hat, step, model_matrix,
+                              exp_off, counts, theta, dev_old, tolerance, max_rel_mu_change);
+    }
+    double conv_test = fabs(dev - dev_old) / (fabs(dev) + 0.1);
+    dev_old = dev;
+    if (std::isnan(conv_test)){
+      // This should not happen
+      beta_hat.fill(NA_REAL);
+      iterations[gene_idx] = max_iter;
+      break;
+    }
+    if (conv_test < tolerance){
+      break;
+    }
+  }
+
+  beta_mat.row(gene_idx) = beta_hat.t();
+  deviance[gene_idx] = dev_old;
+}
 
 //--------------------------------------------------------------------------------------------------//
 // The following code was originally copied from https://github.com/mikelove/DESeq2/blob/master/src/DESeq2.cpp
@@ -221,16 +295,22 @@ List fitBeta_fisher_scoring_impl(RObject Y, const arma::mat& model_matrix, RObje
   // The result
   arma::mat beta_mat = as<arma::mat>(beta_matSEXP);
 
-  auto Y_ext = tatami::consecutive_extractor<false>(&Y_bm, true, 0, n_genes);
-  auto exp_offsets_ext = tatami::consecutive_extractor<false>(&exp_offsets_bm, true, 0, n_genes);
-  arma::Col<double> counts(n_samples), exp_off(n_samples);
-
   // deviance, convergence and tolerance
   NumericVector iterations(n_genes);
   NumericVector deviance(n_genes);
+  
+  auto Y_ext = tatami::consecutive_extractor<false>(&Y_bm, true, 0, n_genes);
+  std::unique_ptr<tatami::OracularDenseExtractor<double, int>> exp_offsets_ext;
+  if(exp_offsets_bm.nrow() > 1){
+    exp_offsets_ext = tatami::consecutive_extractor<false>(&exp_offsets_bm, true, 0, n_genes);
+  }else{
+    exp_offsets_ext = tatami::new_extractor<false, true>(&exp_offsets_bm, true, std::make_shared<ConstIndexOracle<0>>(n_genes));
+  }
+  arma::Col<double> counts(n_samples), exp_off(n_samples);
 
   for (int gene_idx = 0; gene_idx < n_genes; gene_idx++) {
-    if (gene_idx % 100 == 0) checkUserInterrupt();
+    if (gene_idx % 100 == 0)
+      checkUserInterrupt();
 
     // Fill count and offset vector from beachmat matrix. This requires copy_n
     // to ensure that the arma vectors are actually filled.
@@ -239,61 +319,14 @@ List fitBeta_fisher_scoring_impl(RObject Y, const arma::mat& model_matrix, RObje
     auto eptr = exp_offsets_ext->fetch(exp_off.begin());
     tatami::copy_n(eptr, n_samples, exp_off.begin());
 
-    // Init beta and mu
-    arma::vec beta_hat = beta_mat.row(gene_idx).t();
-    arma::vec mu_hat = calculate_mu(model_matrix, beta_hat, exp_off);
-    if(beta_hat.has_nan() || Rcpp::traits::is_na<REALSXP>(thetas(gene_idx))){
-      beta_hat.fill(NA_REAL);
-      iterations(gene_idx) = 0;
-      deviance(gene_idx) = NA_REAL;
-      continue;
+    fitBeta_FS_internal_loop(
+        beta_mat, deviance, iterations,
+        gene_idx, n_samples,
+        counts, exp_off, model_matrix,
+        apply_ridge_penalty, ridge_target, ridge_penalty, ridge_penalty_sq,
+        thetas(gene_idx), tolerance, max_rel_mu_change, max_iter, use_diagonal_approx);
     }
-    // Init deviance
-    double dev_old = 0;
-    if(apply_ridge_penalty){
-      // For diagonal ridge_penalty: pen = Sum (lambda_i b_i)^2
-      double pen_sum = n_samples * arma::as_scalar((beta_hat - ridge_target).t() * ridge_penalty_sq * (beta_hat - ridge_target));
-      dev_old = compute_gp_deviance_sum(counts, mu_hat, thetas(gene_idx)) + pen_sum;
-    }else{
-      dev_old = compute_gp_deviance_sum(counts, mu_hat, thetas(gene_idx));
-    }
-    for (int t = 0; t < max_iter; t++) {
-      iterations(gene_idx)++;
-      // Find good direction to optimize beta
-      arma::vec step;
-      if(use_diagonal_approx){
-        step = fisher_scoring_diagonal_step(model_matrix, counts, mu_hat, thetas(gene_idx) * mu_hat);
-      }else{
-        if(apply_ridge_penalty){
-          step = fisher_scoring_qr_ridge_step(model_matrix, counts, mu_hat, thetas(gene_idx) * mu_hat, ridge_penalty, ridge_target, beta_hat);
-        }else{
-          step = fisher_scoring_qr_step(model_matrix, counts, mu_hat, thetas(gene_idx) * mu_hat);
-        }
-      }
-      // Find step size that actually decreases the deviance
-      double dev = 0;
-      if(apply_ridge_penalty){
-        dev = decrease_deviance_plus_ridge(beta_hat, mu_hat, step, model_matrix, ridge_penalty_sq, ridge_target,
-                                exp_off, counts, thetas(gene_idx), dev_old, tolerance, max_rel_mu_change);
-      }else{
-        dev = decrease_deviance(beta_hat, mu_hat, step, model_matrix,
-                                exp_off, counts, thetas(gene_idx), dev_old, tolerance, max_rel_mu_change);
-      }
-      double conv_test = fabs(dev - dev_old)/(fabs(dev) + 0.1);
-      dev_old = dev;
-      if (std::isnan(conv_test)) {
-        // This should not happen
-        beta_hat.fill(NA_REAL);
-        iterations(gene_idx) = max_iter;
-        break;
-      }
-      if (conv_test < tolerance) {
-        break;
-      }
-    }
-    beta_mat.row(gene_idx) = beta_hat.t();
-    deviance(gene_idx) = dev_old;
-  }
+  
 
   return List::create(
     Named("beta_mat", beta_mat),
@@ -327,6 +360,67 @@ List fitBeta_diagonal_fisher_scoring(RObject Y, const arma::mat& model_matrix, R
 }
 
 
+template<class FVecType, class IVecType>
+void fitBeta_NR_internal_loop(/* in-out parameter */ FVecType &result,
+                              /* in-out parameter */ FVecType &deviance,
+                              /* in-out parameter */ IVecType &iterations,
+                              // below two needed only in case where newton-raphson procedure fails and a call back into R is necessary
+                              /* in-out parameter */ NumericVector &counts_vec,
+                              /* in-out parameter */ NumericVector &off_vec,
+                              int gene_idx, int n_samples,
+                              const double* counts, const double* off, 
+                              const std::function<void(double*, NumericVector&, NumericVector&, const double&)> estimate_betas_group_wise_optimize_helper,
+                              double beta, const double& theta, double tolerance, int maxIter) {
+  if(Rcpp::traits::is_na<REALSXP>(beta) || Rcpp::traits::is_na<REALSXP>(theta)){
+    // Missing values, just continue with next gene
+    result[gene_idx] = NA_REAL;
+    iterations[gene_idx] = 0;
+    deviance[gene_idx] = NA_REAL;
+    return;
+  }
+
+  // Newton-Raphson
+  int iter = 0;
+  for(; iter < maxIter; iter++){
+    double dl = 0.0;
+    double ddl = 0.0;
+    bool all_zero = true;
+    for(int sample_iter = 0; sample_iter < n_samples; sample_iter++){
+      const auto count = counts[sample_iter];
+      all_zero = all_zero && count == 0;
+      const double mu = std::exp(beta + off[sample_iter]);
+      const double denom = 1.0 + mu * theta;
+      dl += (count - mu) / denom;
+      ddl += mu * (1.0 + count * theta) / denom / denom;
+      // ddl += mu / denom;           // This is what edgeR is using
+    }
+    if(all_zero){
+      beta = R_NegInf;
+      break;
+    }
+    const double step = dl / ddl;
+    beta += step;
+    if(std::abs(step) < tolerance){
+      break;
+    }else if(Rcpp::traits::is_nan<REALSXP>(beta)){
+      break;
+    }
+  }
+  if(iter == maxIter || Rcpp::traits::is_nan<REALSXP>(beta)){
+    // Make sure we actually populate the vectors before sending them over to R.
+    tatami::copy_n(counts, n_samples, counts_vec.begin());
+    tatami::copy_n(off, n_samples, off_vec.begin());
+    // Not converged -> try again with optimize()
+    estimate_betas_group_wise_optimize_helper(&beta, counts_vec, off_vec, theta);
+  }
+  result[gene_idx] = beta;
+  iterations[gene_idx] = iter;
+  double dev = 0.0;
+  for(int sample_iter = 0; sample_iter < n_samples; sample_iter++){
+    dev += compute_gp_deviance(counts[sample_iter], exp(beta + off[sample_iter]), theta);
+  }
+  deviance[gene_idx] = dev;
+}
 
 // If there is only one group, there is no need to do the full Fisher-scoring
 // Instead a simple Newton-Raphson algorithm will do
@@ -349,9 +443,14 @@ List fitBeta_one_group(RObject Y, RObject offset_matrix, NumericVector thetas, N
   Function estimate_betas_group_wise_optimize_helper = glmGamPoiEnv["estimate_betas_group_wise_optimize_helper"];
 
   auto Y_ext = tatami::consecutive_extractor<false>(&Y_bm, true, 0, n_genes);
-  auto offset_ext = tatami::consecutive_extractor<false>(&offsets_bm, true, 0, n_genes);
-  Rcpp::NumericVector counts_vec(n_samples), off_vec(n_samples);
-
+  std::unique_ptr<tatami::OracularDenseExtractor<double, int>> offset_ext;
+  if(offsets_bm.nrow() > 1){
+    offset_ext = tatami::consecutive_extractor<false>(&offsets_bm, true, 0, n_genes);
+  }else{
+    offset_ext = tatami::new_extractor<false, true>(&offsets_bm, true, std::make_shared<ConstIndexOracle<0>>(n_genes));
+  }
+  NumericVector counts_vec(n_samples), off_vec(n_samples);
+  
   for(int gene_idx = 0; gene_idx < n_genes; gene_idx++){
     if (gene_idx % 100 == 0) checkUserInterrupt();
 
@@ -361,61 +460,21 @@ List fitBeta_one_group(RObject Y, RObject offset_matrix, NumericVector thetas, N
     // Also note that this function returns pointers that may not actually fill the
     // *_vec vectors, e.g., row-major matrices where a pointer to the underlying
     // array can be directly returned. If *_vec must be filled, use tatami::copy_n.
-    auto counts = Y_ext->fetch(gene_idx, counts_vec.begin());
-    auto off = offset_ext->fetch(gene_idx, off_vec.begin());
+    auto counts = Y_ext->fetch(counts_vec.begin());
+    auto off = offset_ext->fetch(off_vec.begin());
 
-    double beta = beta_start_values(gene_idx);
-    const double& theta = thetas(gene_idx);
-    if(Rcpp::traits::is_na<REALSXP>(beta) || Rcpp::traits::is_na<REALSXP>(theta)){
-      // Missing values, just continue with next gene
-      result(gene_idx) = NA_REAL;
-      iterations(gene_idx) = 0;
-      deviance(gene_idx) = NA_REAL;
-      continue;
-    }
-
-    // Newton-Raphson
-    int iter = 0;
-    for(; iter < maxIter; iter++){
-      double dl = 0.0;
-      double ddl = 0.0;
-      bool all_zero = true;
-      for(int sample_iter = 0; sample_iter < n_samples; sample_iter++){
-        const auto count = counts[sample_iter];
-        all_zero = all_zero && count == 0;
-        const double mu = std::exp(beta + off[sample_iter]);
-        const double denom = 1.0 + mu * theta;
-        dl += (count - mu) / denom;
-        ddl += mu * (1.0 + count * theta) / denom / denom;
-        // ddl += mu / denom;           // This is what edgeR is using
-      }
-      if(all_zero){
-        beta = R_NegInf;
-        break;
-      }
-      const double step = dl / ddl;
-      beta += step;
-      if(std::abs(step) < tolerance){
-        break;
-      }else if(Rcpp::traits::is_nan<REALSXP>(beta)){
-        break;
-      }
-    }
-    if(iter == maxIter || Rcpp::traits::is_nan<REALSXP>(beta)){
-      // Make sure we actually populate the vectors before sending them over to R.
-      tatami::copy_n(counts, n_samples, counts_vec.begin());
-      tatami::copy_n(off, n_samples, off_vec.begin());
-      // Not converged -> try again with optimize()
-      beta =  Rcpp::as<double>(estimate_betas_group_wise_optimize_helper(counts_vec, off_vec, theta));
-    }
-    result(gene_idx) = beta;
-    iterations(gene_idx) = iter;
-    double dev = 0.0;
-    for(int sample_iter = 0; sample_iter < n_samples; sample_iter++){
-      dev += compute_gp_deviance(counts[sample_iter], exp(beta + off[sample_iter]), theta);
-    }
-    deviance(gene_idx) = dev;
+    fitBeta_NR_internal_loop(
+      result, deviance, iterations, counts_vec, off_vec, 
+      gene_idx, n_samples, 
+      counts, off,
+      [&](double *beta, NumericVector& counts_vec, NumericVector& off_vec, const double& theta) -> void { 
+        *beta = Rcpp::as<double>(estimate_betas_group_wise_optimize_helper(counts_vec, off_vec, theta)); 
+      },
+      beta_start_values(gene_idx), thetas(gene_idx), tolerance, maxIter
+    );
   }
+  
+
   return List::create(
     Named("beta", result),
     Named("iter", iterations),

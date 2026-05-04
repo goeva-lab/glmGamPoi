@@ -8,6 +8,11 @@ estimate_betas_roughly <- function(Y, model_matrix, offset_matrix, pseudo_count 
   stopifnot(is.null(ridge_penalty) ||
               (is.matrix(ridge_penalty) && ncol(ridge_penalty) == ncol(model_matrix)) ||
               length(ridge_penalty) == ncol(model_matrix))
+  if(is.vector(offset_matrix, mode = "numeric")){
+    stopifnot(length(offset_matrix) == ncol(Y))
+  }else{
+    stopifnot(dim(offset_matrix) == dim(Y))
+  }
 
   if(nrow(Y) == 0){
     return(matrix(numeric(0), nrow = 0, ncol = ncol(model_matrix)))
@@ -27,8 +32,19 @@ estimate_betas_roughly <- function(Y, model_matrix, offset_matrix, pseudo_count 
   Q <- qr.Q(qrx)[seq_len(nrow(model_matrix)),,drop=FALSE]
   R <- qr.R(qrx)
 
-  norm_log_count_mat <- t(log((Y / exp(offset_matrix) + pseudo_count)))
-  t(solve(R, as.matrix(t(Q) %*% norm_log_count_mat)))
+  if(is.vector(offset_matrix, mode = "numeric")){
+    norm_Y <- div_mtx_colwise(Y, exp(offset_matrix))
+  }else{
+    norm_Y <- div_mtx_elemwise(Y, exp(offset_matrix))
+  }
+
+  if (pseudo_count == 1) {
+    norm_log_count_mat <- log1p(norm_Y)
+  } else {
+    norm_log_count_mat <- log(norm_Y + pseudo_count)
+  }
+
+  t(solve(R, as.matrix(Matrix::tcrossprod(t(Q), norm_log_count_mat))))
 }
 
 
@@ -48,7 +64,12 @@ estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix,
   stopifnot(nrow(beta_mat_init) == nrow(Y))
   stopifnot(ncol(beta_mat_init) == ncol(model_matrix))
   stopifnot(length(dispersions) == nrow(Y))
-  stopifnot(dim(offset_matrix) == dim(Y))
+  if(is.vector(offset_matrix, mode = "numeric")){
+    stopifnot(length(offset_matrix) == ncol(Y))
+  }else{
+    stopifnot(dim(offset_matrix) == dim(Y))
+  }
+
   stopifnot(is.null(ridge_penalty) ||
               (is.matrix(ridge_penalty) && ncol(ridge_penalty) == ncol(model_matrix)) ||
               length(ridge_penalty) == ncol(model_matrix))
@@ -60,14 +81,21 @@ estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix,
   }
 
   exp_offset_matrix <- exp(offset_matrix)
+  if(is.vector(exp_offset_matrix, mode = "numeric")){
+    exp_offset_matrix <- matrix(exp_offset_matrix, nrow = 1)
+  }
   betaRes <- fitBeta_fisher_scoring(initializeCpp(Y), model_matrix, initializeCpp(exp_offset_matrix), dispersions, beta_mat_init,
                                     ridge_penalty_nl = ridge_penalty, tolerance = 1e-8,
-                                    max_rel_mu_change = 1e5, max_iter =  max_iter)
+                                    max_rel_mu_change = 1e5, max_iter = max_iter)
   not_converged <- betaRes$iter == max_iter
-  if(try_recovering_convergence_problems & any(not_converged)){
+  if(try_recovering_convergence_problems && any(not_converged)){
     # Try again with optim
     betaRes2 <- estimate_betas_optim(Y[not_converged,,drop=FALSE], model_matrix,
-                                     offset_matrix[not_converged,,drop=FALSE],
+                                     if(is.vector(offset_matrix, mode = "numeric")){
+                                       offset_matrix
+                                     }else{
+                                       offset_matrix[not_converged,,drop=FALSE]
+                                     },
                                      dispersions = dispersions[not_converged],
                                      beta_mat_init = beta_mat_init[not_converged,,drop=FALSE],
                                      ridge_penalty = ridge_penalty, max_iter = max_iter)
@@ -102,7 +130,11 @@ estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, be
   stopifnot(nrow(beta_mat_init) == nrow(Y))
   stopifnot(ncol(beta_mat_init) == ncol(model_matrix))
   stopifnot(length(dispersions) == nrow(Y))
-  stopifnot(dim(offset_matrix) == dim(Y))
+  if(is.vector(offset_matrix, mode = "numeric")){
+    stopifnot(length(offset_matrix) == ncol(Y))
+  }else{
+    stopifnot(dim(offset_matrix) == dim(Y))
+  }
   stopifnot(is.null(ridge_penalty) ||
               (is.matrix(ridge_penalty) && ncol(ridge_penalty) == ncol(model_matrix)) ||
               length(ridge_penalty) == ncol(model_matrix))
@@ -130,7 +162,11 @@ estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, be
 
   for(idx in seq_len(nrow(Y))){
     y <- Y[idx, ]
-    off <- offset_matrix[idx, ]
+    if(is.vector(offset_matrix, mode = "numeric")){
+      off <- offset_matrix
+    }else{
+      off <- offset_matrix[idx, ]
+    }
     beta_init <- beta_mat_init[idx, ]
     theta <- dispersions[idx]
     if(! apply_ridge){
@@ -166,7 +202,11 @@ estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, be
 #'
 #' @keywords internal
 estimate_betas_roughly_group_wise <- function(Y, offset_matrix, groups){
-  norm_Y <- Y / exp(offset_matrix)
+  if(is.vector(offset_matrix, mode = "numeric")){
+    norm_Y <- div_mtx_colwise(Y, exp(offset_matrix))
+  } else {
+    norm_Y <- div_mtx_elemwise(Y, exp(offset_matrix))
+  }
   do.call(cbind, lapply(unique(groups), function(gr){
     log(DelayedMatrixStats::rowMeans2(norm_Y, cols = groups == gr))
   }))
@@ -186,18 +226,26 @@ estimate_betas_group_wise <- function(Y, offset_matrix,  dispersions, beta_group
   stopifnot(nrow(beta_group_init) == nrow(Y))
   stopifnot(ncol(beta_group_init) == length(unique(groups)))
   stopifnot(length(dispersions) == nrow(Y))
-  stopifnot(dim(offset_matrix) == dim(Y))
+  if(is.vector(offset_matrix, mode = "numeric")){
+    stopifnot(length(offset_matrix) == ncol(Y))
+  }else{
+    stopifnot(dim(offset_matrix) == dim(Y))
+  }
   stopifnot(is.null(beta_mat_init) != is.null(beta_group_init))
   if(is.null(beta_group_init)){
     # Calculate group_init based on Beta
     first_occurence_in_groups <- match(unique(groups), groups)
-    beta_group_init <- beta_mat_init %*% t(model_matrix[first_occurence_in_groups, ,drop=FALSE])
+    beta_group_init <- Matrix::tcrossprod(beta_mat_init, model_matrix[first_occurence_in_groups, ,drop=FALSE])
   }
 
   Beta_res_list <- lapply(unique(groups), function(gr){
     chosen <- gr == groups
     Y_gr <- Y[, chosen, drop = FALSE]
-    offset_gr <- offset_matrix[, chosen, drop = FALSE]
+    if(is.vector(offset_matrix, mode = "numeric")){
+      offset_gr <- matrix(offset_matrix[chosen, drop = FALSE], nrow = 1)
+    }else{
+      offset_gr <- offset_matrix[, chosen, drop = FALSE]
+    }
     betaRes <- fitBeta_one_group(initializeCpp(Y_gr),
                                  initializeCpp(offset_gr), thetas = dispersions,
                                  beta_start_values = beta_group_init[, gr == unique(groups),drop=TRUE],

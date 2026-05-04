@@ -41,6 +41,7 @@
 #'   the result is calculated on disk depending if `offset` is stored on disk.
 #' @param verbose a boolean that indicates if information about the individual steps are
 #'   printed while predicting. Default: `FALSE`.
+#' @param mem_optim see [glm_gp()] parameter of same name
 #' @param ... currently ignored.
 #'
 #' @details
@@ -110,6 +111,7 @@ predict.glmGamPoi <- function(object, newdata = NULL,
                               type = c("link", "response"),
                               se.fit = FALSE,
                               offset = mean(object$Offset),
+                              mem_optim = attr(object, "mem_optim"),
                               on_disk = NULL, verbose = FALSE,
                               ...){
 
@@ -158,9 +160,9 @@ predict.glmGamPoi <- function(object, newdata = NULL,
     }
 
     offset_matrix <- handle_offset_param_for_predict(offset, nrow = nrow(object$Beta),
-                                    ncol = nrow(design_matrix), on_disk = on_disk)
+                                    ncol = nrow(design_matrix), on_disk = on_disk, offset_as_vec = mem_optim[["offset_as_vec"]])
     if(verbose) message("Calculate 'Mu = exp(object$Beta %*% t(design_matrix) + Offset)'")
-    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix)
+    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix, dropout_thresh = mem_optim[["dropout_thresh"]])
     rownames(Mu) <- rownames(object$Beta)
     colnames(Mu) <- mu_colnames
   }
@@ -222,7 +224,7 @@ predict.glmGamPoi <- function(object, newdata = NULL,
           # This is an optimized implementation that is numerically more robust
           Xwave <- rbind(weighted_Design, sqrt(nrow(weighted_Design)) * ridge_penalty)
           Rinv <- qr.solve(qr.R(qr(Xwave)))
-          lhs <- design_matrix %*% (Rinv %*% t(Rinv)) %*% t(weighted_Design)
+          lhs <- design_matrix %*% Matrix::tcrossprod(Matrix::tcrossprod(Rinv), weighted_Design)
           sqrt(matrixStats::rowSums2(lhs^2))
         }
       }, error = function(err){
@@ -291,9 +293,10 @@ make_model_matrix_for_predict <- function(object, newdata){
 
 
 
-handle_offset_param_for_predict <- function(offset, nrow, ncol, on_disk){
+handle_offset_param_for_predict <- function(offset, nrow, ncol, on_disk, offset_as_vec = FALSE){
   if(is.numeric(offset)){
     stopifnot(length(offset) == 1 || length(offset) == ncol)
+    if(offset_as_vec){ return(offset) }
     offset <- matrix(offset, nrow = nrow, ncol = ncol, byrow = TRUE)
   }
   # Check that offset is correctly sized

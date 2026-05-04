@@ -27,6 +27,7 @@ glm_gp_impl <- function(Y, model_matrix,
                         ridge_penalty = 0,
                         do_cox_reid_adjustment = TRUE,
                         subsample = FALSE,
+                        mem_optim = handle_memoptim_parameter(FALSE),
                         verbose = FALSE){
   if(is.vector(Y)){
     Y <- matrix(Y, nrow = 1)
@@ -39,7 +40,7 @@ glm_gp_impl <- function(Y, model_matrix,
   ridge_penalty <- handle_ridge_penalty_parameter(ridge_penalty, model_matrix, verbose = verbose)
 
   # Combine offset and size factor
-  off_and_sf <- combine_size_factors_and_offset(offset, size_factors, Y, verbose = verbose)
+  off_and_sf <- combine_size_factors_and_offset(offset, size_factors, Y, verbose = verbose, offset_as_vec = mem_optim[["offset_as_vec"]])
   offset_matrix <- off_and_sf$offset_matrix
   size_factors <- off_and_sf$size_factors
   if(is(offset_matrix, "DelayedMatrix") && ! is(Y, "DelayedMatrix")){
@@ -76,6 +77,10 @@ glm_gp_impl <- function(Y, model_matrix,
     }
   }
 
+  if(mem_optim[["cast_dgC_Y_to_dgR"]] && is(Y, "CsparseMatrix")){
+    # cast Y to row-major format to improve (?) row-wise memory access when accessing per-gene data
+    Y <- as(Y, "RsparseMatrix")
+  }
 
   # Estimate the betas
   if(! is.null(groups)){
@@ -83,8 +88,8 @@ glm_gp_impl <- function(Y, model_matrix,
     beta_group_init <- estimate_betas_roughly_group_wise(Y, offset_matrix, groups)
     if(verbose){ message("Estimate beta") }
     beta_res <- estimate_betas_group_wise(Y, offset_matrix = offset_matrix,
-                                         dispersions = disp_init, beta_group_init = beta_group_init,
-                                         groups = groups, model_matrix = model_matrix)
+                                          dispersions = disp_init, beta_group_init = beta_group_init,
+                                          groups = groups, model_matrix = model_matrix)
   }else{
     # Init beta with reasonable values
     if(verbose){ message("Make initial beta estimate") }
@@ -97,7 +102,7 @@ glm_gp_impl <- function(Y, model_matrix,
 
   # Calculate corresponding predictions
   # Mu <- exp(Beta %*% t(model_matrix) + offset_matrix)
-  Mu <- calculate_mu(Beta, model_matrix, offset_matrix)
+  Mu <- calculate_mu(Beta, model_matrix, offset_matrix, dropout_thresh = mem_optim[["mu_dropout_thresh"]], dropout_by_row = mem_optim[["cast_dgC_Y_to_dgR"]])
 
   # Make estimate of over-disperion
   if(isTRUE(overdispersion) || (is.character(overdispersion) && overdispersion == "global")){
@@ -130,16 +135,16 @@ glm_gp_impl <- function(Y, model_matrix,
     if(verbose){ message("Estimate beta again") }
     if(! is.null(groups)){
       beta_res <- estimate_betas_group_wise(Y, offset_matrix = offset_matrix,
-                                       dispersions = disp_latest, beta_mat_init = Beta,
-                                       groups = groups, model_matrix = model_matrix)
+                                            dispersions = disp_latest, beta_mat_init = Beta,
+                                            groups = groups, model_matrix = model_matrix)
     }else{
       beta_res <- estimate_betas_fisher_scoring(Y, model_matrix = model_matrix, offset_matrix = offset_matrix,
-                                            dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty)
+                                                dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty)
     }
     Beta <- beta_res$Beta
 
     # Calculate corresponding predictions
-    Mu <- calculate_mu(Beta, model_matrix, offset_matrix)
+    Mu <- calculate_mu(Beta, model_matrix, offset_matrix, dropout_thresh = mem_optim[["mu_dropout_thresh"]], dropout_by_row = mem_optim[["cast_dgC_Y_to_dgR"]])
   }else if(isTRUE(overdispersion_shrinkage) || is.numeric(overdispersion_shrinkage)){
     # Given predefined disp_est shrink them
     disp_est <- disp_init
@@ -150,15 +155,15 @@ glm_gp_impl <- function(Y, model_matrix,
     if(verbose){ message("Estimate beta again") }
     if(! is.null(groups)){
       beta_res <- estimate_betas_group_wise(Y, offset_matrix = offset_matrix,
-                                       dispersions = disp_latest, beta_mat_init = Beta,
-                                       groups = groups, model_matrix = model_matrix)
+                                            dispersions = disp_latest, beta_mat_init = Beta,
+                                            groups = groups, model_matrix = model_matrix)
     }else{
       beta_res <- estimate_betas_fisher_scoring(Y, model_matrix = model_matrix, offset_matrix = offset_matrix,
-                                            dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty)
+                                                dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty)
     }
     Beta <- beta_res$Beta
     # Calculate corresponding predictions
-    Mu <- calculate_mu(Beta, model_matrix, offset_matrix)
+    Mu <- calculate_mu(Beta, model_matrix, offset_matrix, dropout_thresh = mem_optim[["mu_dropout_thresh"]], dropout_by_row = mem_optim[["cast_dgC_Y_to_dgR"]])
   }else{
     # Use disp_init, because it is already in vector shape
     disp_est <- disp_init

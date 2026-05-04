@@ -184,4 +184,78 @@ solve_lm_for_B <- function(Y, A, w = NULL){
   }
 }
 
+# sparsity aware element-wise division (e.g. hadamard/schur operation)
+# performs specific optimizations to conserve sparsity/layout of output iff:
+# - `lhs` is `dgCMatrix` or `dgRMatrix`
+# - `rhs` is entirely non-zero
+div_mtx_elemwise <- function(lhs, rhs) {
+  stopifnot(dim(lhs) == dim(rhs)) # elementwise operation
 
+  # division of zero by zero does not preserve
+  # sparsity so to ensure correctness we skip this
+  # optimization if zero values are present in the rhs
+  if(all(rhs != 0)){
+    if(is(lhs, "dsparseMatrix")){
+      t.lhs <- as(lhs, "TsparseMatrix")
+      lhs@x <- lhs@x / c(rhs)[t.lhs@i + (t.lhs@j * nrow(lhs)) + 1]
+      return(lhs)
+    }
+  }
+  lhs / rhs
+}
+
+# sparsity aware column-wise division (e.g. elements of `rhs` represent a divisor for each column of `lhs`)
+# performs specific optimizations to conserve sparsity/layout of output iff:
+# - `lhs` is `dgCMatrix` or `dgRMatrix`
+# - `rhs` is entirely non-zero
+div_mtx_colwise <- function(lhs, rhs) {
+  stopifnot(ncol(lhs) == length(rhs)) # column-wise operation
+
+  # division of zero by zero does not preserve
+  # sparsity so to ensure correctness we skip this
+  # optimization if zero values are present in the rhs
+  if(all(rhs != 0)){
+    if(is(lhs, "dgCMatrix")){
+      lhs@x <- lhs@x / rep(rhs, diff(lhs@p))
+      return(lhs)
+    }else if(is(lhs, "dgRMatrix")){
+      lhs@x <- lhs@x / rhs[lhs@j + 1]
+      return(lhs)
+    }
+  }
+  sweep(lhs, 2, rhs, `/`)
+}
+
+handle_memoptim_parameter <- function(param) {
+  default_opts <- list(
+    "offset_as_vec" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
+    "mu_dropout_thresh" = list(0, function(e) (is.numeric(e) && (length(e) == 1)), "numeric of length 1"),
+    "cast_dgC_Y_to_dgR" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
+  )
+
+  out <- if(is.logical(param) && (length(param) == 1)){
+    list(
+      "offset_as_vec" = param, "mu_dropout_thresh" = as.numeric(param), "cast_dgC_Y_to_dgR" = param
+    )
+  }else if(is.list(param) && (length(union(names(default_opts), names(param)))) == length(default_opts)){
+    for(nm in names(param)){
+      if(!default_opts[[nm]][[2]](param[[nm]])){
+        stop(sprintf(
+          "got mem_optim parameter (`%s`, at index - `%s`) of wrong type/shape, must be %s",
+          param[[nm]],
+          nm,
+          default_opts[[nm]][[3]]
+        ))
+      }
+    }
+    utils::modifyList(lapply(default_opts, function(e) e[[1]]), param)
+  }else{
+    stop(sprintf(
+      "got mem_optim parameter (`%s`) of wrong type/shape, must be list with names `%s` (or a subset thereof) or logical of length 1",
+      paste0(sprintf("%s=%s", names(param), param), collapse = ", "),
+      paste0(names(default_opts), collapse = ", ")
+    ))
+  }
+
+  out
+}
