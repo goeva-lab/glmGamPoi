@@ -345,6 +345,86 @@ test_that("test_de works with compute_lfc_se", {
   expect_false("lfc_se" %in% colnames(res3))
 })
 
+test_that("test_de works with degenerate designs", {
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 3000, size = 0.3), nrow = 30, ncol  =10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
+                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  design <- model.matrix(~ group, data = annot)
+  design <- cbind(design, design[,2])
+  attr(design, "ignore_degeneracy") <- TRUE
+  cntrst <- matrix(c(0, 1, 0), nrow = 1)
+  fit <- glm_gp(Y, design = design, overdispersion_shrinkage = TRUE, size_factors = "ratio",
+                ridge_penalty = 1e-3)
+  skip("test_de with compute_lfc_se cannot handle degenerate designs")
+  res <- test_de(fit, contrast = c(cntrst), compute_lfc_se=TRUE)
+  expect_true(all(res$lfc_se > 10))
+
+  # res$pval_alt <- with(res, 2 * pnorm(abs(lfc / lfc_se), lower.tail = FALSE))
+  # head(res)
+  # expect_equal(0.3 * fit$Beta[,2], fit$Beta[,3], tolerance = 1e-4)
+  # pred <- predict(fit, se.fit=TRUE, newdata=matrix(cntrst, nrow=1))
+  #
+  # # Wald Test P-value
+  # plot(res$pval, res$pval_alt); abline(0,1)
+  #
+  # gene_idx <- 1
+  # disp <- fit$overdispersions[gene_idx]
+  # mu <- fit$Mu[gene_idx,]
+  # weights <- mu / (1 + mu * disp)
+  # weighted_Design <-  fit$model_matrix * sqrt(weights)
+  # ridge_penalty <- diag(1e-3, nrow = ncol(fit$model_matrix))
+  #
+  # # Below is an optimized formula to calculate the variance covariance matrix (X'X)^-1
+  # # See https://stats.stackexchange.com/a/407734/130486
+  # Rinv <- qr.solve(qr.R(qr(weighted_Design)))
+  # lhs <- cntrst %*% Rinv
+  # sqrt(matrixStats::rowSums2(lhs^2))
+  #
+  # # This is the explicit formula to calculate the variance covariance matrix with ridge.
+  # # Formula is from "Wald test" section page 18 of  DESeq2 paper (Love et al., 2014)
+  # XtwX <- t(weighted_Design) %*% weighted_Design
+  # XtwX_ridge_inv <- solve(XtwX + nrow(weighted_Design) * t(ridge_penalty) %*% ridge_penalty)
+  # cov_mat <- XtwX_ridge_inv %*% XtwX %*% XtwX_ridge_inv
+  # sqrt(diag(cntrst %*% cov_mat %*% t(cntrst)))
+  #
+  # # This is an optimized implementation that is numerically more robust
+  # Xwave <- rbind(weighted_Design, sqrt(nrow(weighted_Design)) * ridge_penalty)
+  # Rinv <- qr.solve(qr.R(qr(Xwave)))
+  # lhs <- cntrst %*% (Rinv %*% t(Rinv)) %*% t(weighted_Design)
+  # sqrt(matrixStats::rowSums2(lhs^2))
+  #
+  # # Fourth option
+  # Qr <- qr(Xwave)
+  # p1 <- seq_len(Qr$rank)
+  # cov_mat2 <- chol2inv(Qr$qr[p1, p1, drop = FALSE])
+  # sqrt(diag(cntrst %*% cov_mat2 %*% t(cntrst)))
+  #
+  # lm_fit <- treelabel:::modern_glm(1:10, design = design, family = gaussian())
+  # lm_fit$coefficients
+  # treelabel:::test_diff(lm_fit, cntrst)
+  #
+  # ################# Linear model
+  # design <- model.matrix(~ group, data = annot)
+  # design <- cbind(design, design[,2])
+  # cntrst <- matrix(c(0, 1, 0), nrow = 1)
+  # ridge_penalty <- diag(1e-3, nrow = ncol(design))
+  # y <- rnorm(10)
+  # lm_fit <- lm(y ~ design - 1)
+  # coef(lm_fit)
+  # c(solve(t(design) %*% design + ridge_penalty) %*% t(design) %*% y)
+  # lm_summary <- summary(lm(y ~ design - 1))
+  # lm_summary$sigma^2 * lm_summary$cov.unscaled
+  # lm_summary$sigma^2 * solve(t(design) %*% design + ridge_penalty)
+  # cov_mat <- solve(t(design) %*% design + ridge_penalty) %*% t(design) %*% diag(residuals(lm_fit)^2) %*% design %*% solve(t(design) %*% design + ridge_penalty)
+  # cntrst %*% cov_mat %*% t(cntrst)
+  # sandwich::vcovHC(lm_fit, type = "HC0")
+  #
+  # V <- svd(design)$v
+  # mod_design <- design %*% V
+  # cov_mat2 <- solve(t(mod_design) %*% mod_design + ridge_penalty) %*% t(mod_design) %*% diag(residuals(lm_fit)^2) %*% mod_design %*% solve(t(mod_design) %*% mod_design + ridge_penalty)
+  # V %*% cov_mat2 %*% t(V)
+})
+
 
 # test_that("glmGamPoi results are similar to DESeq2",{
 #   Y <- matrix(rnbinom(n = 30 * 10, mu = 3000, size = 0.3), nrow = 30, ncol  =10)

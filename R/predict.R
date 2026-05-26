@@ -176,6 +176,11 @@ predict.glmGamPoi <- function(object, newdata = NULL,
 
   if(se.fit){
     if(verbose) message("'se.fit' is TRUE, calculate the standard error for each Mu estimate")
+    qr_mm <- qr(object$model_matrix)
+    if(qr_mm$rank < ncol(object$model_matrix) && nrow(object$model_matrix) > 0){
+      stop("'model_matrix' is not full rank, calculating the standard error is not supported.")
+    }
+
     p_idxs <- seq_len(ncol(object$model_matrix))
     # This could (should?) be adapted to the quasi-GamPoi value
     scale <- 1
