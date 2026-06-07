@@ -290,8 +290,18 @@ glm_gp <- function(data,
   if(! is.null(res$ridge_penalty)){
     names(res$ridge_penalty) <- colnames(res$model_matrix)
   }
-  rownames(res$Mu) <- rownames(data)
-  colnames(res$Mu) <- colnames(data)
+  if(is.function(res$Mu)){
+    .old <- res$Mu
+    res$Mu <- function(obs = NULL, feats = NULL) {
+      o <- .old(obs, feats)
+      rownames(o) <- rownames(data)[feats]
+      colnames(o) <- colnames(data)[obs]
+      o
+    }
+  }else{
+    rownames(res$Mu) <- rownames(data)
+    colnames(res$Mu) <- colnames(data)
+  }
   if(is.vector(res$Offset, mode = "numeric")){
     names(res$Offset) <- colnames(data)
   }else{
@@ -304,7 +314,7 @@ glm_gp <- function(data,
 
   attr(res, "mem_optim") <- mem_optim
 
-  class(res) <- "glmGamPoi"
+  class(res) <- "glmGamPoi2"
   res
 }
 
@@ -668,7 +678,7 @@ extract_data_from_formula <- function(formula, col_data, encl = parent.frame()){
 }
 
 
-is_on_disk.glmGamPoi <- function(fit){
+is_on_disk.glmGamPoi2 <- function(fit){
   is(fit$Mu, "DelayedMatrix") && is(DelayedArray::seed(fit$Mu), "HDF5ArraySeed")
 }
 

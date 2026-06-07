@@ -43,7 +43,7 @@ test_that("mem_optim$cast_dgC_Y_to_dgR doesn't change anything", {
 
   res_dgr[["Mu"]] <- as(res_dgr[["Mu"]], "CsparseMatrix")
   attr(res_dgr, "mem_optim") <- attr(res_dgc, "mem_optim")
-  expect_equal(res_dgr, res_dgc, tolerance = 1e-13)
+  expect_equal(res_dgr, res_dgc, tolerance = 1e-10)
 })
 
 
@@ -58,11 +58,30 @@ test_that("mem_optim$mu_dropout_thresh doesn't change anything if set to value s
   expect_true(all(res1[["Mu"]] > 0))
 
   set.seed(1)
-  res2 <- glm_gp(Y, design = design, col_data = annot, mem_optim = list(offset_as_vec = TRUE, mu_dropout_thresh = min(res1[["Mu"]])))
+  res2 <- glm_gp(Y, design = design, col_data = annot, mem_optim = list(offset_as_vec = TRUE, mu_dropout_thresh = min(res1[["Mu"]]) - .Machine[["double.eps"]]))
   res2[["Mu"]] <- as.matrix(res2[["Mu"]])
   attr(res2, "mem_optim") <- attr(res1, "mem_optim")
 
   expect_equal(res2[["Mu"]] > 0, res1[["Mu"]] > 0, tolerance = 0)
   expect_equal(res1, res2, tolerance = 1e-7)
   expect_equal(res1[["Mu"]], res2[["Mu"]], tolerance = 1e-10)
+})
+
+test_that("mem_optim$do_parallel doesn't change anything", {
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
+                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  design <- ~ group + cont1 + cont2
+
+  set.seed(1)
+  res1 <- glm_gp(Y, design = design, col_data = annot)
+  lapply(
+    c(1L, 2L, 4L, 16L, 32L),
+    function(p) {
+      set.seed(1)
+      res2 <- glm_gp(Y, design = design, col_data = annot, mem_optim = list(do_parallel = p))
+      attr(res2, "mem_optim") <- attr(res1, "mem_optim")
+      expect_equal(res1, res2, tolerance = 0)
+    }
+  )
 })

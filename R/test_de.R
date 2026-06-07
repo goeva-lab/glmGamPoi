@@ -211,7 +211,7 @@ test_de_q <- function(fit,
     size_factor_subset <- fit$size_factors[subset_to_e]
 
     fit_subset <- glm_gp(data_subset, design = model_matrix_subset, size_factors = size_factor_subset,
-                  overdispersion = fit$overdispersions, on_disk = is_on_disk.glmGamPoi(fit), mem_optim = mem_optim, verbose = verbose)
+                  overdispersion = fit$overdispersions, on_disk = is_on_disk.glmGamPoi2(fit), mem_optim = mem_optim, verbose = verbose)
     test_res <- test_de_q(fit_subset, contrast = {{contrast}}, reduced_design = reduced_design,
                           subset_to = NULL, pseudobulk_by = NULL,
                           pval_adjust_method = pval_adjust_method, sort_by = sort_by,
@@ -298,7 +298,7 @@ test_de_q <- function(fit,
   }
   if(verbose){message("Fit reduced model")}
   data <- fit$data
-  do_on_disk <- is_on_disk.glmGamPoi(fit)
+  do_on_disk <- is_on_disk.glmGamPoi2(fit)
   if(isTRUE(attr(fit$model_matrix, "ignore_degeneracy"))){
     attr(reduced_design, "ignore_degeneracy") <- TRUE
   }

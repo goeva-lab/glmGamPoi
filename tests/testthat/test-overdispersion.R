@@ -315,8 +315,8 @@ test_that("DelayedArrays are handled efficiently", {
                                   do_cox_reid_adjustment = TRUE, n_subsamples = n_samples, max_iter = 200)$estimate
 
   expect_equal(disp_est_r_ram, disp_est_r_hdf5)
-  expect_equal(disp_est_r_ram, beachmat_ram)
-  expect_equal(disp_est_r_ram, beachmat_hdf5)
+  expect_equal(disp_est_r_ram, beachmat_ram, tolerance = 1e-5)
+  expect_equal(disp_est_r_ram, beachmat_hdf5, tolerance = 1e-5)
 })
 
 

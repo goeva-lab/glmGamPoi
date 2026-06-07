@@ -107,7 +107,7 @@
 #'
 #'
 #' @export
-predict.glmGamPoi <- function(object, newdata = NULL,
+predict.glmGamPoi2 <- function(object, newdata = NULL,
                               type = c("link", "response"),
                               se.fit = FALSE,
                               offset = mean(object$Offset),
@@ -116,6 +116,9 @@ predict.glmGamPoi <- function(object, newdata = NULL,
                               ...){
 
   type <- match.arg(type, c("link", "response"))
+  if(is.function(object$Mu)){
+    object$Mu <- object$Mu()
+  }
   if(is.null(newdata)){
     # Easy, just return mu
     if(verbose) message("'newdata' is NULL, use 'Mu = object$Mu'")
@@ -162,7 +165,7 @@ predict.glmGamPoi <- function(object, newdata = NULL,
     offset_matrix <- handle_offset_param_for_predict(offset, nrow = nrow(object$Beta),
                                     ncol = nrow(design_matrix), on_disk = on_disk, offset_as_vec = mem_optim[["offset_as_vec"]])
     if(verbose) message("Calculate 'Mu = exp(object$Beta %*% t(design_matrix) + Offset)'")
-    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix, dropout_thresh = mem_optim[["dropout_thresh"]])
+    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
     rownames(Mu) <- rownames(object$Beta)
     colnames(Mu) <- mu_colnames
   }
@@ -247,7 +250,7 @@ predict.glmGamPoi <- function(object, newdata = NULL,
 
 
 make_model_matrix_for_predict <- function(object, newdata){
-  stopifnot("glmGamPoi" %in% class(object))
+  stopifnot("glmGamPoi2" %in% class(object))
   form <- object$design_formula
   if(is.null(form)){
     stop("predict.glmGamPoi was called with 'newdata' that is not a matrix. ",

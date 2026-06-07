@@ -86,7 +86,7 @@ estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix,
   }
   betaRes <- fitBeta_fisher_scoring(initializeCpp(Y), model_matrix, initializeCpp(exp_offset_matrix), dispersions, beta_mat_init,
                                     ridge_penalty_nl = ridge_penalty, tolerance = 1e-8,
-                                    max_rel_mu_change = 1e5, max_iter = max_iter)
+                                    max_rel_mu_change = 1e5, max_iter = max_iter, FALSE)
   not_converged <- betaRes$iter == max_iter
   if(try_recovering_convergence_problems && any(not_converged)){
     # Try again with optim
@@ -146,53 +146,7 @@ estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, be
     attr(ridge_penalty, "target") <- ridge_target
   }
 
-  apply_ridge <- ! is.null(ridge_penalty)
-  n_samples <- ncol(Y)
-  if(apply_ridge){
-    ridge_penalty_sq <- t(ridge_penalty) %*% ridge_penalty
-    ridge_target <- if(is.null(attr(ridge_penalty, "target", TRUE))){
-      rep(0, ncol(model_matrix))
-    }else{
-      attr(ridge_penalty, "target", TRUE)
-    }
-  }
-  result <- list(Beta = matrix(NA, nrow = nrow(Y), ncol = ncol(model_matrix)),
-                 iterations = rep(NA, nrow(Y)),
-                 deviances = rep(NA, nrow(Y)))
-
-  for(idx in seq_len(nrow(Y))){
-    y <- Y[idx, ]
-    if(is.vector(offset_matrix, mode = "numeric")){
-      off <- offset_matrix
-    }else{
-      off <- offset_matrix[idx, ]
-    }
-    beta_init <- beta_mat_init[idx, ]
-    theta <- dispersions[idx]
-    if(! apply_ridge){
-      res <- optim(par = beta_init, function(beta){
-        mu <- exp(model_matrix %*% beta + off)
-        compute_gp_deviance_sum(y, mu, theta)
-      }, method = "BFGS", control = list(maxit = max_iter))
-    }else{
-      res <- optim(par = beta_init, function(beta){
-        mu <- exp(model_matrix %*% beta + off)
-        penalty <- n_samples * t(beta - ridge_target) %*% ridge_penalty_sq %*% (beta - ridge_target)
-        compute_gp_deviance_sum(y, mu, theta) + penalty
-      }, method = "BFGS", control = list(maxit = max_iter))
-    }
-    if(res$convergence != 0){
-      result$iterations[idx] <- max_iter
-      result$Beta[idx, ] <- NA_real_
-      result$deviances[idx] <- NA_real_
-    }else{
-      result$iterations[idx] <- min(res$counts[1], max_iter - 1)
-      result$Beta[idx, ] <- res$par
-      result$deviances[idx] <- res$value
-    }
-  }
-
-  result
+  fitBeta_optim(initializeCpp(Y), model_matrix, initializeCpp(exp(offset_matrix)), dispersions, beta_mat_init, ridge_penalty, max_iter)
 }
 
 
@@ -246,7 +200,7 @@ estimate_betas_group_wise <- function(Y, offset_matrix,  dispersions, beta_group
     }else{
       offset_gr <- offset_matrix[, chosen, drop = FALSE]
     }
-    betaRes <- fitBeta_one_group(initializeCpp(Y_gr),
+    fitBeta_one_group(initializeCpp(Y_gr),
                                  initializeCpp(offset_gr), thetas = dispersions,
                                  beta_start_values = beta_group_init[, gr == unique(groups),drop=TRUE],
                                  tolerance = 1e-8, maxIter = 100)

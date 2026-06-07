@@ -102,17 +102,24 @@ glm_gp_impl <- function(Y, model_matrix,
 
   # Calculate corresponding predictions
   # Mu <- exp(Beta %*% t(model_matrix) + offset_matrix)
-  Mu <- calculate_mu(Beta, model_matrix, offset_matrix, dropout_thresh = mem_optim[["mu_dropout_thresh"]], dropout_by_row = mem_optim[["cast_dgC_Y_to_dgR"]])
+  Mu <- if(mem_optim[["delay_mu"]]){
+    mk_delayed_mu(Beta, model_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
+  }else{
+    calculate_mu(Beta, model_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
+  }
 
   # Make estimate of over-disperion
   if(isTRUE(overdispersion) || (is.character(overdispersion) && overdispersion == "global")){
     if(verbose){ message("Estimate dispersion") }
+    Mu_o <- if(is.function(Mu)) { list(offset_matrix = offset_matrix,beta_mat = Beta, fn = Mu) } else { Mu }
+    
     if(isTRUE(overdispersion)){
-      disp_est <- overdispersion_mle(Y, Mu, model_matrix = model_matrix,
+
+      disp_est <- overdispersion_mle(Y, Mu_o, model_matrix = model_matrix,
                                      do_cox_reid_adjustment = do_cox_reid_adjustment,
                                      subsample = subsample, verbose = verbose)$estimate
     }else if(is.character(overdispersion) && overdispersion == "global"){
-      disp_est <- overdispersion_mle(Y, Mu, model_matrix = model_matrix,
+      disp_est <- overdispersion_mle(Y, Mu_o, model_matrix = model_matrix,
                                      do_cox_reid_adjustment = do_cox_reid_adjustment,
                                      global_estimate = TRUE,
                                      subsample = subsample, verbose = verbose)$estimate
@@ -120,7 +127,7 @@ glm_gp_impl <- function(Y, model_matrix,
     }
 
     if(isTRUE(overdispersion_shrinkage)){
-      dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = DelayedMatrixStats::rowMeans2(Mu),
+      dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = if (is.function(Mu)) { Map(function(i) mean(Mu(feats = i)), nrow(Y)) } else { DelayedMatrixStats::rowMeans2(Mu) },
                                                    df = subsample - ncol(model_matrix),
                                                    ql_disp_trend  = length(disp_est) >= 100,
                                                    npoints = max(0.1 * length(disp_est), 100),
@@ -140,15 +147,20 @@ glm_gp_impl <- function(Y, model_matrix,
     }else{
       beta_res <- estimate_betas_fisher_scoring(Y, model_matrix = model_matrix, offset_matrix = offset_matrix,
                                                 dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty)
+
     }
     Beta <- beta_res$Beta
 
     # Calculate corresponding predictions
-    Mu <- calculate_mu(Beta, model_matrix, offset_matrix, dropout_thresh = mem_optim[["mu_dropout_thresh"]], dropout_by_row = mem_optim[["cast_dgC_Y_to_dgR"]])
+    Mu <- if(mem_optim[["delay_mu"]]){
+      mk_delayed_mu(Beta, model_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
+    }else{
+      calculate_mu(Beta, model_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
+    }
   }else if(isTRUE(overdispersion_shrinkage) || is.numeric(overdispersion_shrinkage)){
     # Given predefined disp_est shrink them
     disp_est <- disp_init
-    dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = DelayedMatrixStats::rowMeans2(Mu),
+    dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = if (is.function(Mu)) { Map(function(i) mean(Mu(feats = i)), nrow(Y)) } else { DelayedMatrixStats::rowMeans2(Mu) },
                                                      df = subsample - ncol(model_matrix),
                                                      disp_trend = overdispersion_shrinkage, verbose = verbose)
     disp_latest <- dispersion_shrinkage$dispersion_trend
@@ -163,7 +175,11 @@ glm_gp_impl <- function(Y, model_matrix,
     }
     Beta <- beta_res$Beta
     # Calculate corresponding predictions
-    Mu <- calculate_mu(Beta, model_matrix, offset_matrix, dropout_thresh = mem_optim[["mu_dropout_thresh"]], dropout_by_row = mem_optim[["cast_dgC_Y_to_dgR"]])
+    Mu <- if(mem_optim[["delay_mu"]]){
+      mk_delayed_mu(Beta, model_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
+    }else{
+      calculate_mu(Beta, model_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
+    }
   }else{
     # Use disp_init, because it is already in vector shape
     disp_est <- disp_init

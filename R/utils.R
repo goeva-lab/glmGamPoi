@@ -230,12 +230,18 @@ handle_memoptim_parameter <- function(param) {
   default_opts <- list(
     "offset_as_vec" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
     "mu_dropout_thresh" = list(0, function(e) (is.numeric(e) && (length(e) == 1)), "numeric of length 1"),
-    "cast_dgC_Y_to_dgR" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
+    "cast_dgC_Y_to_dgR" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
+    "do_parallel" = list(0L, function(e) (is.integer(e) && (length(e) == 1)), "integer of length 1"),
+    "delay_mu" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
   )
 
   out <- if(is.logical(param) && (length(param) == 1)){
     list(
-      "offset_as_vec" = param, "mu_dropout_thresh" = as.numeric(param), "cast_dgC_Y_to_dgR" = param
+      "offset_as_vec" = param,
+      "mu_dropout_thresh" = as.numeric(param),
+      "cast_dgC_Y_to_dgR" = param,
+      "do_parallel" = as.integer(param),
+      "delay_mu" = param
     )
   }else if(is.list(param) && (length(union(names(default_opts), names(param)))) == length(default_opts)){
     for(nm in names(param)){

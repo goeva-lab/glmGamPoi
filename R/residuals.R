@@ -28,10 +28,13 @@
 #'
 #' @seealso [glm_gp()] and `stats::residuals.glm()
 #' @export
-residuals.glmGamPoi <- function(object, type = c("deviance", "pearson", "randomized_quantile", "working", "response"), ...){
+residuals.glmGamPoi2 <- function(object, type = c("deviance", "pearson", "randomized_quantile", "working", "response"), ...){
   type <- match.arg(type, c("deviance", "pearson", "randomized_quantile", "working", "response"))
   Y <- assay(object$data)
-  make_resid_hdf5_mat <- is_on_disk.glmGamPoi(object)
+  if(is.function(object$Mu)){
+    object$Mu <- object$Mu()
+  }
+  make_resid_hdf5_mat <- is_on_disk.glmGamPoi2(object)
   ret <- if(type == "deviance"){
     if(! make_resid_hdf5_mat){
       compute_gp_deviance_residuals_matrix(Y, object$Mu, object$overdispersions)
