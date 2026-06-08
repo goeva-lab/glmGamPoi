@@ -47,12 +47,12 @@ inline double decrease_deviance(
     const EMB<D5> &exp_off, const EMB<D6> &counts,
     // misc params
     const double theta, const double dev_old, const double tolerance, const double max_rel_mu_change) {
-  double speeding_factor = 1.0;
-  int line_iter = 0;
-  double dev = 0;
   beta_hat += step;
+
+  double speeding_factor = 1.0;
+  double dev = 0;
   const VectorXd mu_old = mu_hat;
-  while (true) {
+  for (auto line_iter = 0;; line_iter++) {
     mu_hat = calculate_mu<D2>(model_matrix, beta_hat, exp_off);
     dev = cgp_sum(counts, mu_hat, theta, beta_hat);
     const double conv_test = std::fabs(dev - dev_old) / (std::fabs(dev) + 0.1);
@@ -68,7 +68,6 @@ inline double decrease_deviance(
       speeding_factor = speeding_factor / 2.0;
       beta_hat = beta_hat - (step * speeding_factor);
     }
-    line_iter++;
   }
   return dev;
 }

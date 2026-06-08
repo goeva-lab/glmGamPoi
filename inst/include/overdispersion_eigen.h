@@ -52,7 +52,7 @@ const double cr_correction_factor = 0.99;
 template <class D1, class D2, class D3, class D4, class D5>
 inline double conventional_loglikelihood_fast_impl(const EMB<D1> &y, const EMB<D2> &mu, double log_theta, const EMB<D3> &model_matrix,
                                                    const bool do_cr_adj, const EMB<D4> &unique_counts, const EMB<D5> &count_frequencies) {
-  double theta = std::exp(log_theta);
+  const double theta = std::exp(log_theta);
   double cr_term = 0.0;
   if (do_cr_adj) {
     MatrixXd b = model_matrix.transpose() * (model_matrix.array().colwise() * (mu.cwiseInverse().array() + theta).cwiseInverse()).matrix();
@@ -66,7 +66,9 @@ inline double conventional_loglikelihood_fast_impl(const EMB<D1> &y, const EMB<D
     }
     cr_term = -0.5 * ld * cr_correction_factor;
   }
-  double theta_neg1 = 1.0 / theta;
+
+  const double theta_neg1 = 1.0 / theta;
+
   double lgamma_term;
   // If summarized counts are available use those to calculate sum(lgamma(y + theta_neg1))
   if (unique_counts.size() > 0 && unique_counts.size() == count_frequencies.size()) {
@@ -75,8 +77,8 @@ inline double conventional_loglikelihood_fast_impl(const EMB<D1> &y, const EMB<D
     lgamma_term = (y.array() + theta_neg1).unaryExpr(std::ref(lgamma_impl)).sum();
   }
   lgamma_term -= y.size() * lgamma_impl(theta_neg1);
-  double ll_part = (-(y.array() + theta_neg1) * (mu.array() + theta_neg1).log()).sum();
-  ll_part -= y.size() * theta_neg1 * log_theta;
+
+  const double ll_part = (-(y.array() + theta_neg1) * (mu.array() + theta_neg1).log()).sum() - (y.size() * theta_neg1 * log_theta);
   return lgamma_term + ll_part + cr_term;
 }
 
@@ -86,7 +88,6 @@ template <class D1, class D2, class D3, class D4, class D5>
 inline double conventional_score_function_fast_impl(const EMB<D1> &y, const EMB<D2> &mu, double log_theta, const EMB<D3> &model_matrix,
                                                     const bool do_cr_adj, const EMB<D4> &unique_counts, const EMB<D5> &count_frequencies) {
   const double theta = std::exp(log_theta);
-  const double theta_neg1 = 1.0 / theta;
 
   double cr_term = 0.0;
   if (do_cr_adj) {
@@ -94,19 +95,22 @@ inline double conventional_score_function_fast_impl(const EMB<D1> &y, const EMB<
 
     MatrixXd b = model_matrix.transpose() * (model_matrix.array().colwise() * w_diag).matrix();
     const MatrixXd db = model_matrix.transpose() * (model_matrix.array().colwise() * (-w_diag.square())).matrix();
-    MatrixXd b_inv = MatrixXd::Identity(b.rows(), b.cols());
+
     // The diag(1e-6) protects against singular matrices
+    MatrixXd b_inv = MatrixXd::Identity(b.rows(), b.cols());
     b.diagonal().array() += 1e-6;
     b.llt().solveInPlace(b_inv);
+
     cr_term = -0.5 * (b_inv * db).trace() * cr_correction_factor;
   }
 
+  const double theta_neg1 = 1.0 / theta;
   double digamma_term, max_y, sum_y, sum_prod_y;
   // If summarized counts are available use those to calculate sum(digamma(y + theta_neg1))
   if (unique_counts.size() > 0 && unique_counts.size() == count_frequencies.size()) {
     digamma_term = (count_frequencies.array() * (unique_counts.array() + theta_neg1).unaryExpr(std::ref(digamma_impl))).sum();
     max_y = unique_counts.maxCoeff();
-    ArrayXd prod_freqs = (count_frequencies.array() * unique_counts.array());
+    const ArrayXd prod_freqs = (count_frequencies.array() * unique_counts.array());
     sum_y = prod_freqs.sum();
     sum_prod_y = (prod_freqs * (unique_counts.array() - 1)).sum();
   } else {
@@ -120,7 +124,7 @@ inline double conventional_score_function_fast_impl(const EMB<D1> &y, const EMB<
   // Due to numerical imprecision the digamma_term reaches sum(y) sometimes
   // quicker than the ll_term, thus I subtract the first term of the
   // Laurent series expansion at x -> inf
-  double corr = theta_neg1 > 1e5 ? sum_prod_y / (2 * theta_neg1) : 0.0;
+  const double corr = theta_neg1 > 1e5 ? sum_prod_y / (2 * theta_neg1) : 0.0;
   if (max_y * 1e6 < theta_neg1) {
     digamma_term = sum_y - corr;
   } else {
@@ -129,15 +133,15 @@ inline double conventional_score_function_fast_impl(const EMB<D1> &y, const EMB<
     digamma_term = std::min(digamma_term, sum_y - corr);
   }
   const double ll_part = (mu.unaryExpr([&theta = std::as_const(theta), &theta_neg1 = std::as_const(theta_neg1)](double mu) -> double {
-                              double mu_theta = mu * theta;
+                              const double mu_theta = mu * theta;
                               if (mu_theta < 1e-10) {
                                 return mu_theta * mu_theta * (1 / (1 + mu_theta) - 0.5);
                               } else if (mu_theta < 1e-4) {
                                 // The bounds are based on the Taylor expansion of log(1 + x) for x = 0.
-                                double inv = 1 / (1 + mu_theta);
-                                double upper_bound = mu_theta * mu_theta * inv;
-                                double lower_bound = mu_theta * mu_theta * (inv - 0.5);
-                                double suggest = (log(1 + mu_theta) - mu / (mu + theta_neg1));
+                                const double inv = 1 / (1 + mu_theta);
+                                const double upper_bound = mu_theta * mu_theta * inv;
+                                const double lower_bound = mu_theta * mu_theta * (inv - 0.5);
+                                const double suggest = (log(1 + mu_theta) - mu / (mu + theta_neg1));
                                 return std::max(std::min(suggest, upper_bound), lower_bound);
                               } else {
                                 return log(1 + mu_theta) - mu / (mu + theta_neg1);
@@ -155,55 +159,55 @@ inline double conventional_score_function_fast_impl(const EMB<D1> &y, const EMB<
 template <class D1, class D2, class D3, class D4, class D5>
 inline double conventional_deriv_score_function_fast_impl(const EMB<D1> &y, const EMB<D2> &mu, double log_theta, const EMB<D3> &model_matrix,
                                                           const bool do_cr_adj, const EMB<D4> &unique_counts, const EMB<D5> &count_frequencies) {
-  double theta = std::exp(log_theta);
+  const double theta = std::exp(log_theta);
   double cr_term = 0.0;
   double cr_term2 = 0.0;
   if (do_cr_adj) {
-    ArrayXd w_diag = (mu.cwiseInverse().array() + theta).cwiseInverse();
+    const ArrayXd w_diag = (mu.cwiseInverse().array() + theta).cwiseInverse();
 
     MatrixXd b = model_matrix.transpose() * (model_matrix.array().colwise() * w_diag).matrix();
-    MatrixXd db = model_matrix.transpose() * (model_matrix.array().colwise() * (-w_diag.square())).matrix();
-    MatrixXd d2b = model_matrix.transpose() * (model_matrix.array().colwise() * (2 * w_diag.cube())).matrix();
-    MatrixXd b_inv = MatrixXd::Identity(b.rows(), b.cols());
+    const MatrixXd db = model_matrix.transpose() * (model_matrix.array().colwise() * (-w_diag.square())).matrix();
+    const MatrixXd d2b = model_matrix.transpose() * (model_matrix.array().colwise() * (2 * w_diag.cube())).matrix();
 
-    // The diag(1e-6) protects against singular matrices
+    // The diag(1e-6) protects against singular matrices    
+    MatrixXd b_inv = MatrixXd::Identity(b.rows(), b.cols());
     b.diagonal().array() += 1e-6;
     b.llt().solveInPlace(b_inv);
 
-    MatrixXd d_i_db = b_inv * db;
-    double ddetb = d_i_db.trace();
-    double ddetb_pow2 = ddetb * ddetb;
-    double d2detb = ((ddetb_pow2 - (d_i_db * d_i_db).trace() + (b_inv * d2b).trace()));
+    const MatrixXd d_i_db = b_inv * db;
+    const double ddetb = d_i_db.trace();
+    const double ddetb_pow2 = ddetb * ddetb;
+    const double d2detb = ((ddetb_pow2 - (d_i_db * d_i_db).trace() + (b_inv * d2b).trace()));
     cr_term = (0.5 * ddetb_pow2 - 0.5 * d2detb) * cr_correction_factor;
     cr_term2 = -0.5 * ddetb * cr_correction_factor;
   }
 
-  double theta_neg1 = 1.0 / theta;
-  double theta_neg2 = theta_neg1 * theta_neg1;
+  const double theta_neg1 = 1.0 / theta;
+  const double theta_neg2 = theta_neg1 * theta_neg1;
 
   double digamma_term, trigamma_term;
   // If summarized counts are available use those to calculate sum(digamma()) and sum(trigamma())
   if (unique_counts.size() > 0 && unique_counts.size() == count_frequencies.size()) {
-    ArrayXd counts_p_theta_neg1 = unique_counts.array() + theta_neg1;
+    const ArrayXd counts_p_theta_neg1 = unique_counts.array() + theta_neg1;
     digamma_term = (count_frequencies.array() * counts_p_theta_neg1.unaryExpr(std::ref(digamma_impl))).sum();
     trigamma_term = (count_frequencies.array() * counts_p_theta_neg1.unaryExpr(std::ref(trigamma_impl))).sum();
     trigamma_term *= theta_neg2;
   } else {
-    ArrayXd counts_p_theta_neg1 = y.array() + theta_neg1;
+    const ArrayXd counts_p_theta_neg1 = y.array() + theta_neg1;
     digamma_term = counts_p_theta_neg1.unaryExpr(std::ref(digamma_impl)).sum();
     trigamma_term = theta_neg2 * counts_p_theta_neg1.unaryExpr(std::ref(trigamma_impl)).sum();
   }
   digamma_term -= y.size() * digamma_impl(theta_neg1);
   trigamma_term -= theta_neg2 * y.size() * trigamma_impl(theta_neg1);
 
-  ArrayXd mu_theta = mu.array() * theta;
-  double ll_part_1 = (mu_theta.log1p() + ((y - mu).array() / (mu.array() + theta_neg1))).sum();
+  const ArrayXd mu_theta = mu.array() * theta;
+  const double ll_part_1 = (mu_theta.log1p() + ((y - mu).array() / (mu.array() + theta_neg1))).sum();
   // original expression was: (mu^2 * theta + y) / ((1 + mu * theta) * (1 + mu * theta))
   // however, to avoid computing mu^2 (which can generate infinite values when mu is very large, leading to NaNs)
   // we divide both sides of the quotient by mu, yielding: (mu * theta + y / mu) / ((1 / mu + theta) * (1 + mu * theta))
-  double ll_part_2 = ((mu_theta + (y.array() / mu.array())) / ((mu_theta + 1) * (theta + mu.cwiseInverse().array()))).sum();
+  const double ll_part_2 = ((mu_theta + (y.array() / mu.array())) / ((mu_theta + 1) * (theta + mu.cwiseInverse().array()))).sum();
 
-  double ll_part = -2 * theta_neg1 * (ll_part_1 - digamma_term) + (ll_part_2 + trigamma_term);
+  const double ll_part = -2 * theta_neg1 * (ll_part_1 - digamma_term) + (ll_part_2 + trigamma_term);
 
   double res = ll_part + cr_term * (theta * theta) + (ll_part_1 - digamma_term) * theta_neg1 + cr_term2 * theta;
   return res;
@@ -258,7 +262,7 @@ inline void lbfgs_overdispersion_mle_impl(double &est, int &iters_out, std::stri
     }
   });
 
-  auto tab = make_map_if_small(y, /*stop_if_larger = */ y.size() / 2);
+  const auto tab = make_map_if_small(y, /*stop_if_larger = */ y.size() / 2);
   VectorXd unique_counts(tab.size()), count_frequencies(tab.size());
   int i = 0;
   for (auto p : tab) {
@@ -266,7 +270,7 @@ inline void lbfgs_overdispersion_mle_impl(double &est, int &iters_out, std::stri
     count_frequencies(i) = (double)p.second;
     i++;
   }
-  double far_left_value = conventional_score_function_fast_impl(y, mean_vec_clamp, std::log(1e-8), model_matrix, do_cox_reid_adjustment,
+  const double far_left_value = conventional_score_function_fast_impl(y, mean_vec_clamp, std::log(1e-8), model_matrix, do_cox_reid_adjustment,
                                                                 unique_counts, count_frequencies);
 
   if (far_left_value < 0) {

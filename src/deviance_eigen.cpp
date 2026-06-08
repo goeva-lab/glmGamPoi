@@ -10,7 +10,7 @@ double compute_gp_deviance_mask(const double y, const double mu,const double the
 // [[Rcpp::export(name = "compute_gp_deviance_sum")]]
 double compute_gp_deviance_sum_mask(const NumericVector y,const NumericVector mu,const double theta) {
   double dev = 0.0;
-  int n_elem = y.size();
+  const int n_elem = y.size();
   for (int i = 0; i < n_elem; i++) {
     dev += compute_gp_deviance(y[i], mu[i], theta);
   }
@@ -20,14 +20,14 @@ double compute_gp_deviance_sum_mask(const NumericVector y,const NumericVector mu
 // [[Rcpp::export(name = "compute_gp_deviance_residuals_matrix")]]
 Eigen::MatrixXd compute_gp_deviance_residuals_matrix_mask(const SEXP Y_SEXP, const Eigen::Map<Eigen::MatrixXd> &Mu,
                                                           const Eigen::Map<Eigen::MatrixXd> &thetas) {
-  SEXP dims = Rf_getAttrib(Y_SEXP, R_DimSymbol);
-  int nrow = INTEGER(dims)[0];
-  int ncol = INTEGER(dims)[1];
+  const SEXP dims = Rf_getAttrib(Y_SEXP, R_DimSymbol);
+  const int nrow = INTEGER(dims)[0];
+  const int ncol = INTEGER(dims)[1];
   if (TYPEOF(Y_SEXP) == INTSXP) {
-    Eigen::Map<MatrixX<int>> Y(INTEGER(Y_SEXP), nrow, ncol);
+    const Eigen::Map<const MatrixX<int>> Y(INTEGER(Y_SEXP), nrow, ncol);
     return compute_gp_deviance_residuals_matrix_impl(Y, Mu, thetas);
   } else if (TYPEOF(Y_SEXP) == REALSXP) {
-    Eigen::Map<MatrixX<double>> Y(REAL(Y_SEXP), nrow, ncol);
+    const Eigen::Map<const MatrixX<double>> Y(REAL(Y_SEXP), nrow, ncol);
     return compute_gp_deviance_residuals_matrix_impl(Y, Mu, thetas);
   } else {
     stop("Cannot handle Y_SEXP of this type.");

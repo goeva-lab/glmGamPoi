@@ -34,7 +34,7 @@ template <class D1, class D2> inline double compute_gp_deviance_sum(const EMB<D1
   double dev = 0.0;
   auto y_begin = y.cbegin();
   auto mu_begin = mu.cbegin();
-  auto y_end = y.cend();
+  const auto y_end = y.cend();
   for (; y_begin != y_end; ++y_begin, ++mu_begin) {
     dev += compute_gp_deviance(*y_begin, *mu_begin, theta);
   }
@@ -44,14 +44,14 @@ template <class D1, class D2> inline double compute_gp_deviance_sum(const EMB<D1
 template <class D1, class D2, class D3>
 inline MatrixXd compute_gp_deviance_residuals_matrix_impl(const Eigen::MatrixBase<D1> &Y, const Eigen::MatrixBase<D2> &Mu,
                                                           const Eigen::MatrixBase<D3> &thetas) {
-  auto nr = Y.rows();
-  auto nc = Y.cols();
+  const auto nr = Y.rows();
+  const auto nc = Y.cols();
   MatrixXd result(nr, nc);
   for (auto i = 0; i < nr; ++i) {
-    auto theta = thetas(i);
+    const auto theta = thetas(i);
     for (auto j = 0; j < nc; ++j) {
-      auto y = Y(i, j);
-      auto mu = Mu(i, j);
+      const auto y = Y(i, j);
+      const auto mu = Mu(i, j);
       result(i, j) = sgn(y - mu) * std::sqrt(compute_gp_deviance(y, mu, theta));
     }
   }
