@@ -86,27 +86,8 @@ estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix,
   }
   betaRes <- fitBeta_fisher_scoring(initializeCpp(Y), model_matrix, initializeCpp(exp_offset_matrix), dispersions, beta_mat_init,
                                     ridge_penalty_nl = ridge_penalty, tolerance = 1e-8,
-                                    max_rel_mu_change = 1e5, max_iter = max_iter, FALSE)
-  not_converged <- betaRes$iter == max_iter
-  if(try_recovering_convergence_problems && any(not_converged)){
-    # Try again with optim
-    betaRes2 <- estimate_betas_optim(Y[not_converged,,drop=FALSE], model_matrix,
-                                     if(is.vector(offset_matrix, mode = "numeric")){
-                                       offset_matrix
-                                     }else{
-                                       offset_matrix[not_converged,,drop=FALSE]
-                                     },
-                                     dispersions = dispersions[not_converged],
-                                     beta_mat_init = beta_mat_init[not_converged,,drop=FALSE],
-                                     ridge_penalty = ridge_penalty, max_iter = max_iter)
-    betaRes$beta_mat[not_converged, ] <- betaRes2$Beta
-    betaRes$deviance[not_converged] <- betaRes2$deviances
-    betaRes$iter[not_converged] <- betaRes2$iterations
-  }
-  # Don't use 'not_converged' because optim might recover some cases
+                                    max_rel_mu_change = 1e5, max_iter = max_iter, try_recov_w_optim = try_recovering_convergence_problems)
   warn_non_convergence(betaRes$iter == max_iter, rownames(Y))
-
-
 
   list(Beta = betaRes$beta_mat, iterations = betaRes$iter, deviances = betaRes$deviance)
 }
