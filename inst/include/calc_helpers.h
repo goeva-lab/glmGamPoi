@@ -5,8 +5,16 @@
 template <class D> using EMB = Eigen::MatrixBase<D>;
 
 template <class D4, class D1, class D2, class D3>
-inline D4 calculate_mu(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat, const EMB<D3> &exp_off) {
+inline D4 calculate_mu_mult(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat, const EMB<D3> &exp_off) {
   return ((model_matrix * beta_hat).array().exp() * exp_off.array()).unaryExpr([](double exp_x) {
+    // clamp to avoid large / zero values
+    return (exp_x < 1e-50) ? 1e-50 : ((exp_x > 1e50) ? 1e50 : exp_x);
+  });
+}
+
+template <class D4, class D1, class D2, class D3>
+inline D4 calculate_mu_add(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat, const EMB<D3> &off) {
+  return ((model_matrix * beta_hat).array() + off.array()).exp().unaryExpr([](double exp_x) {
     // clamp to avoid large / zero values
     return (exp_x < 1e-50) ? 1e-50 : ((exp_x > 1e50) ? 1e50 : exp_x);
   });

@@ -75,7 +75,7 @@
 #' @seealso [glm_gp()]
 #' @export
 #' @importFrom beachmat initializeCpp
-overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustment = !is.null(model_matrix), global_estimate = FALSE, subsample = FALSE, max_iter = 200, verbose = FALSE) {
+overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustment = !is.null(model_matrix), global_estimate = FALSE, subsample = FALSE, max_iter = 200, verbose = FALSE, use_lbfgsb_impl = FALSE, do_parallel = 0) {
   # Validate n_subsampling
   stopifnot(length(subsample) == 1, subsample >= 0)
   if (isFALSE(subsample)) {
@@ -104,9 +104,17 @@ overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustm
     } else {
       # This function calls overdispersion_mle() for each row, but is faster than a vapply()
       if (is.list(mean)) {
-        estimate_overdispersions_fast_delayed(initializeCpp(y), model_matrix, exp(mean[["offset_matrix"]]), mean[["beta_mat"]], do_cox_reid_adjustment, n_subsamples, max_iter)
+        (if (use_lbfgsb_impl) {
+          function(...) estimate_overdispersions_lbfgs_fast_delayed(..., do_parallel = do_parallel)
+        } else {
+          estimate_overdispersions_fast_delayed
+        })(initializeCpp(y), model_matrix, mean[["offset_matrix"]], mean[["beta_mat"]], do_cox_reid_adjustment, n_subsamples, max_iter)
       } else {
-        estimate_overdispersions_fast(initializeCpp(y), initializeCpp(mean), model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter)
+        (if (use_lbfgsb_impl) {
+          function(...) estimate_overdispersions_lbfgs_fast_delayed(..., do_parallel = do_parallel)
+        } else {
+          estimate_overdispersions_fast
+        })(initializeCpp(y), initializeCpp(mean), model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter)
       }
     }
   } else {
@@ -242,12 +250,16 @@ conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matri
 
 
 #' @importFrom beachmat initializeCpp
-estimate_global_overdispersion <- function(Y, Mu, model_matrix, do_cox_reid_adjustment) {
+estimate_global_overdispersion <- function(Y, Mu, model_matrix, do_cox_reid_adjustment, do_parallel = 0) {
   # The idea to calculate the log-likelihood and than maximize the interpolation
   # is from edgeR.
   # The runtime is linear with the number of `log_thetas`
   log_thetas <- seq(-6, 1, length.out = 10)
-  log_likes <- estimate_global_overdispersions_fast(initializeCpp(Y), initializeCpp(Mu), model_matrix, do_cox_reid_adjustment, log_thetas)
+  log_likes <- if (is.list(Mu)) {
+    estimate_global_overdispersions_fast_delayed(initializeCpp(Y), model_matrix, Mu[["offset_matrix"]], Mu[["beta_mat"]], do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
+  } else {
+    estimate_global_overdispersions_fast(initializeCpp(Y), initializeCpp(Mu), model_matrix, do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
+  }
   spl <- spline(log_thetas, log_likes, n = 1000)
   est <- exp(spl$x[which.max(spl$y)])
   list(estimate = est, iterations = 10, message = "global estimate using spline interpolation")

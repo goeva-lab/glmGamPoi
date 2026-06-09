@@ -58,8 +58,9 @@ estimate_betas_roughly <- function(Y, model_matrix, offset_matrix, pseudo_count 
 #' @importFrom beachmat initializeCpp
 estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix,
                                           dispersions, beta_mat_init, ridge_penalty,
-                                          try_recovering_convergence_problems = TRUE){
-  max_iter <- 1000
+                                          try_recovering_convergence_problems = TRUE,
+                                          max_iter = 1000,
+                                          do_parallel = 0){
   stopifnot(nrow(model_matrix) == ncol(Y))
   stopifnot(nrow(beta_mat_init) == nrow(Y))
   stopifnot(ncol(beta_mat_init) == ncol(model_matrix))
@@ -86,7 +87,7 @@ estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix,
   }
   betaRes <- fitBeta_fisher_scoring(initializeCpp(Y), model_matrix, initializeCpp(exp_offset_matrix), dispersions, beta_mat_init,
                                     ridge_penalty_nl = ridge_penalty, tolerance = 1e-8,
-                                    max_rel_mu_change = 1e5, max_iter = max_iter, try_recov_w_optim = try_recovering_convergence_problems)
+                                    max_rel_mu_change = 1e5, max_iter = max_iter, try_recov_w_optim = try_recovering_convergence_problems, do_parallel = do_parallel)
   warn_non_convergence(betaRes$iter == max_iter, rownames(Y))
 
   list(Beta = betaRes$beta_mat, iterations = betaRes$iter, deviances = betaRes$deviance)
@@ -106,7 +107,7 @@ warn_non_convergence <- function(not_converged, rownames){
   }
 }
 
-estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, beta_mat_init, ridge_penalty, max_iter = 1000){
+estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, beta_mat_init, ridge_penalty, max_iter = 1000, do_parallel = 0){
   stopifnot(nrow(model_matrix) == ncol(Y))
   stopifnot(nrow(beta_mat_init) == nrow(Y))
   stopifnot(ncol(beta_mat_init) == ncol(model_matrix))
@@ -127,7 +128,7 @@ estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, be
     attr(ridge_penalty, "target") <- ridge_target
   }
 
-  fitBeta_optim(initializeCpp(Y), model_matrix, initializeCpp(exp(offset_matrix)), dispersions, beta_mat_init, ridge_penalty, max_iter)
+  fitBeta_optim(initializeCpp(Y), model_matrix, initializeCpp(exp(offset_matrix)), dispersions, beta_mat_init, ridge_penalty, max_iter, do_parallel = do_parallel)
 }
 
 
@@ -157,7 +158,7 @@ estimate_betas_roughly_group_wise <- function(Y, offset_matrix, groups){
 #'
 #' @keywords internal
 #' @importFrom beachmat initializeCpp
-estimate_betas_group_wise <- function(Y, offset_matrix,  dispersions, beta_group_init = NULL, beta_mat_init = NULL, groups, model_matrix){
+estimate_betas_group_wise <- function(Y, offset_matrix,  dispersions, beta_group_init = NULL, beta_mat_init = NULL, groups, model_matrix, max_iter = 100, do_parallel = 0){
   stopifnot(nrow(beta_group_init) == nrow(Y))
   stopifnot(ncol(beta_group_init) == length(unique(groups)))
   stopifnot(length(dispersions) == nrow(Y))
@@ -184,7 +185,7 @@ estimate_betas_group_wise <- function(Y, offset_matrix,  dispersions, beta_group
     fitBeta_one_group(initializeCpp(Y_gr),
                                  initializeCpp(offset_gr), thetas = dispersions,
                                  beta_start_values = beta_group_init[, gr == unique(groups),drop=TRUE],
-                                 tolerance = 1e-8, maxIter = 100)
+                                 tolerance = 1e-8, max_iter = max_iter, do_parallel = do_parallel)
   })
   Beta <- do.call(cbind, lapply(Beta_res_list, function(x) x$beta))
   Iteration_mat <- do.call(cbind, lapply(Beta_res_list, function(x) x$iter))

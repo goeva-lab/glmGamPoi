@@ -1,6 +1,10 @@
 #ifndef FIT_BETA_H
 #define FIT_BETA_H
 
+#include "LBFGSpp/include/LBFGSpp/LineSearchBacktracking.h"
+#include "LBFGSpp/include/LBFGSpp/LineSearchMoreThuente.h"
+#include "LBFGSpp/include/LBFGSpp/LineSearchNocedalWright.h"
+#include "LBFGSpp/include/LBFGSpp/Param.h"
 #include <calc_helpers.h>
 #include <deviance_eigen.h>
 #include <fisher_scoring_steps_eigen.h>
@@ -53,7 +57,7 @@ inline double decrease_deviance(
   double dev = 0;
   const VectorXd mu_old = mu_hat;
   for (auto line_iter = 0;; line_iter++) {
-    mu_hat = calculate_mu<D2>(model_matrix, beta_hat, exp_off);
+    mu_hat = calculate_mu_mult<D2>(model_matrix, beta_hat, exp_off);
     dev = cgp_sum(counts, mu_hat, theta, beta_hat);
     const double conv_test = std::fabs(dev - dev_old) / (std::fabs(dev) + 0.1);
     const double mu_rel_change = mu_hat.cwiseQuotient(mu_old).maxCoeff();
@@ -79,39 +83,37 @@ private:
   const EMB<D2> &counts_;
   const EMB<D3> &exp_off_;
   const double &theta_;
+  const double &eps_;
   inline double fn_(const VectorXd &beta_row) const {
-    return cgp_sum_(counts_, calculate_mu<VectorXd>(model_matrix_, beta_row, exp_off_), theta_, beta_row);
+    return cgp_sum_(counts_, calculate_mu_mult<VectorXd>(model_matrix_, beta_row, exp_off_), theta_, beta_row);
+  }
+  inline void grad_(VectorXd &x, VectorXd &grad) const {
+    auto x_begin = x.begin();
+    const auto x_end = x.end();
+    auto grad_begin = grad.begin();
+    for (; x_begin != x_end; ++x_begin, ++grad_begin) {
+      const auto x_curr = *x_begin;
+      *x_begin = x_curr + eps_;
+      const auto v1 = fn_(x);
+      *x_begin = x_curr - eps_;
+      const auto v2 = fn_(x);
+      *grad_begin = (v1 - v2) / (2 * eps_);
+      *x_begin = x_curr;
+    }
   }
 
 public:
-  BetaOptim(const Fn1 &cgp_sum, const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &exp_off, const double &theta)
-      : cgp_sum_(cgp_sum), model_matrix_(model_matrix), counts_(counts), exp_off_(exp_off), theta_(theta) {};
-  inline double operator()(const VectorXd &beta_row, VectorXd &grad) const {
-    const auto out = fn_(beta_row);
-
-    // we do not know the gradient here explicitly, approximating instead using a numerical method
-    // we need to copy the beta values since the provided reference is const
-    // the eps value (1e-3) is taken from the default value used by R for this algorithm
-    VectorXd beta_c = beta_row;
-    auto beta_begin = beta_c.begin();
-    const auto beta_end = beta_c.end();
-    auto grad_begin = grad.begin();
-
-    for (; beta_begin != beta_end; ++beta_begin, ++grad_begin) {
-      const double b_curr = *beta_begin;
-      *beta_begin = b_curr + 1e-3;
-      const double v1 = fn_(beta_c);
-      *beta_begin = b_curr - 1e-3;
-      const double v2 = fn_(beta_c);
-      *grad_begin = (v1 - v2) / 2e-3;
-      *beta_begin = b_curr;
-    }
-
-    return out;
+  BetaOptim(const Fn1 &cgp_sum, const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &exp_off, const double &theta, const double &eps)
+      : cgp_sum_(cgp_sum), model_matrix_(model_matrix), counts_(counts), exp_off_(exp_off), theta_(theta), eps_(eps) {};
+  inline double operator()(const VectorXd &x, VectorXd &grad) const {
+    // we need to make a copy of input since it is provided as a const reference
+    VectorXd x_c = x;
+    grad_(x_c, grad);
+    return fn_(x);
   }
 };
 
-const double RELTOL = std::sqrt(DBL_EPSILON);
+const double SQRT_DBL_EPS = std::sqrt(DBL_EPSILON);
 template <class D1, class D2, class D3, class Fn1>
 inline void fitBeta_FS_optim_step(
     // in-out params
@@ -124,14 +126,22 @@ inline void fitBeta_FS_optim_step(
     const double theta, const int max_iter) {
   LBFGSpp::LBFGSParam params;
   params.max_iterations = max_iter;
+  // using numerical approximation of derivative, gradient based stopping point is not desirable
+  params.epsilon = 0;
+  params.epsilon_rel = 0;
+  // using delta based stopping point instead, delta value determined through some manual testing
   params.past = 1;
-  params.delta = RELTOL;
-
+  params.delta = 1e-12;
+  // NocedalWright linesearch fails to find value, using MoreThuente instead
   LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
-  double fx;
-  const BetaOptim fn(cgp_sum, model_matrix, counts, exp_off, theta);
 
-  iters_out = solver.minimize(fn, beta_out, fx);
+  // default used by the Eigen::NumericalDiff module 
+  const auto eps = SQRT_DBL_EPS;
+  const BetaOptim f(cgp_sum, model_matrix, counts, exp_off, theta, eps);
+  double fx;
+
+  iters_out = solver.minimize(f, beta_out, fx);
+
   if (iters_out == max_iter) {
     beta_out.fill(NAN);
     dev_out = NAN;
@@ -153,7 +163,7 @@ inline void fitBeta_FS_internal_step(
 
   // Init beta and mu
   VectorXd beta_hat = beta_out;
-  VectorXd mu_hat = calculate_mu<VectorXd>(model_matrix, beta_hat, exp_off);
+  VectorXd mu_hat = calculate_mu_mult<VectorXd>(model_matrix, beta_hat, exp_off);
 
   if (beta_hat.array().isNaN().any() || std::isnan(theta)) {
     beta_out.fill(NAN);

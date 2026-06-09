@@ -89,14 +89,15 @@ glm_gp_impl <- function(Y, model_matrix,
     if(verbose){ message("Estimate beta") }
     beta_res <- estimate_betas_group_wise(Y, offset_matrix = offset_matrix,
                                           dispersions = disp_init, beta_group_init = beta_group_init,
-                                          groups = groups, model_matrix = model_matrix)
+                                          groups = groups, model_matrix = model_matrix, do_parallel = mem_optim[["do_parallel"]])
   }else{
     # Init beta with reasonable values
     if(verbose){ message("Make initial beta estimate") }
     beta_init <- estimate_betas_roughly(Y, model_matrix, offset_matrix = offset_matrix, ridge_penalty = ridge_penalty)
     if(verbose){ message("Estimate beta") }
     beta_res <- estimate_betas_fisher_scoring(Y, model_matrix = model_matrix, offset_matrix = offset_matrix,
-                                              dispersions = disp_init, beta_mat_init = beta_init, ridge_penalty = ridge_penalty)
+                                              dispersions = disp_init, beta_mat_init = beta_init, ridge_penalty = ridge_penalty,
+                                              do_parallel = mem_optim[["do_parallel"]])
   }
   Beta <- beta_res$Beta
 
@@ -117,12 +118,14 @@ glm_gp_impl <- function(Y, model_matrix,
 
       disp_est <- overdispersion_mle(Y, Mu_o, model_matrix = model_matrix,
                                      do_cox_reid_adjustment = do_cox_reid_adjustment,
-                                     subsample = subsample, verbose = verbose)$estimate
+                                     subsample = subsample, verbose = verbose,
+                                     do_parallel = mem_optim[["do_parallel"]])$estimate
     }else if(is.character(overdispersion) && overdispersion == "global"){
       disp_est <- overdispersion_mle(Y, Mu_o, model_matrix = model_matrix,
                                      do_cox_reid_adjustment = do_cox_reid_adjustment,
                                      global_estimate = TRUE,
-                                     subsample = subsample, verbose = verbose)$estimate
+                                     subsample = subsample, verbose = verbose,
+                                     do_parallel = mem_optim[["do_parallel"]])$estimate
       disp_est <- rep(disp_est, times = nrow(Y))
     }
 
@@ -143,10 +146,10 @@ glm_gp_impl <- function(Y, model_matrix,
     if(! is.null(groups)){
       beta_res <- estimate_betas_group_wise(Y, offset_matrix = offset_matrix,
                                             dispersions = disp_latest, beta_mat_init = Beta,
-                                            groups = groups, model_matrix = model_matrix)
+                                            groups = groups, model_matrix = model_matrix, do_parallel = mem_optim[["do_parallel"]])
     }else{
       beta_res <- estimate_betas_fisher_scoring(Y, model_matrix = model_matrix, offset_matrix = offset_matrix,
-                                                dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty)
+                                                dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty, do_parallel = mem_optim[["do_parallel"]])
 
     }
     Beta <- beta_res$Beta
@@ -168,10 +171,10 @@ glm_gp_impl <- function(Y, model_matrix,
     if(! is.null(groups)){
       beta_res <- estimate_betas_group_wise(Y, offset_matrix = offset_matrix,
                                             dispersions = disp_latest, beta_mat_init = Beta,
-                                            groups = groups, model_matrix = model_matrix)
+                                            groups = groups, model_matrix = model_matrix, do_parallel = mem_optim[["do_parallel"]])
     }else{
       beta_res <- estimate_betas_fisher_scoring(Y, model_matrix = model_matrix, offset_matrix = offset_matrix,
-                                                dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty)
+                                                dispersions = disp_latest, beta_mat_init = Beta, ridge_penalty = ridge_penalty, do_parallel = mem_optim[["do_parallel"]])
     }
     Beta <- beta_res$Beta
     # Calculate corresponding predictions

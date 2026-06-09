@@ -21,20 +21,20 @@ get_row_groups <- function(matrix, n_groups, tolerance = 1e-10) {
     .Call(`_glmGamPoi2_get_row_groups`, matrix, n_groups, tolerance)
 }
 
-fitBeta_fisher_scoring <- function(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim = FALSE) {
-    .Call(`_glmGamPoi2_fitBeta_fisher_scoring`, Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim)
+fitBeta_fisher_scoring <- function(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim = FALSE, do_parallel = 0L) {
+    .Call(`_glmGamPoi2_fitBeta_fisher_scoring`, Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim, do_parallel)
 }
 
-fitBeta_diagonal_fisher_scoring <- function(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim = FALSE) {
-    .Call(`_glmGamPoi2_fitBeta_diagonal_fisher_scoring`, Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim)
+fitBeta_diagonal_fisher_scoring <- function(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim = FALSE, do_parallel = 0L) {
+    .Call(`_glmGamPoi2_fitBeta_diagonal_fisher_scoring`, Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, tolerance, max_rel_mu_change, max_iter, try_recov_w_optim, do_parallel)
 }
 
-fitBeta_optim <- function(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, max_iter) {
-    .Call(`_glmGamPoi2_fitBeta_optim`, Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, max_iter)
+fitBeta_optim <- function(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, max_iter, do_parallel = 0L) {
+    .Call(`_glmGamPoi2_fitBeta_optim`, Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, ridge_penalty_nl, max_iter, do_parallel)
 }
 
-fitBeta_one_group <- function(Y, offset_matrix, thetas, beta_start_values, tolerance, maxIter) {
-    .Call(`_glmGamPoi2_fitBeta_one_group`, Y, offset_matrix, thetas, beta_start_values, tolerance, maxIter)
+fitBeta_one_group <- function(Y, offset_matrix, thetas, beta_start_values, tolerance, max_iter, do_parallel = 0L) {
+    .Call(`_glmGamPoi2_fitBeta_one_group`, Y, offset_matrix, thetas, beta_start_values, tolerance, max_iter, do_parallel)
 }
 
 compute_gp_deviance <- function(y, mu, theta) {
@@ -69,20 +69,24 @@ estimate_overdispersions_fast <- function(Y, mean_matrix, model_matrix, do_cox_r
     .Call(`_glmGamPoi2_estimate_overdispersions_fast`, Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter)
 }
 
-estimate_overdispersions_fast_delayed <- function(Y, model_matrix, exp_offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter) {
-    .Call(`_glmGamPoi2_estimate_overdispersions_fast_delayed`, Y, model_matrix, exp_offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter)
+estimate_overdispersions_fast_delayed <- function(Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter) {
+    .Call(`_glmGamPoi2_estimate_overdispersions_fast_delayed`, Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter)
 }
 
-estimate_global_overdispersions_fast <- function(Y, mean_matrix, model_matrix, do_cox_reid_adjustment, log_thetas) {
-    .Call(`_glmGamPoi2_estimate_global_overdispersions_fast`, Y, mean_matrix, model_matrix, do_cox_reid_adjustment, log_thetas)
+estimate_global_overdispersions_fast <- function(Y, mean_matrix, model_matrix, do_cox_reid_adjustment, log_thetas, do_parallel = 0L) {
+    .Call(`_glmGamPoi2_estimate_global_overdispersions_fast`, Y, mean_matrix, model_matrix, do_cox_reid_adjustment, log_thetas, do_parallel)
 }
 
-estimate_overdispersions_lbfgs_fast <- function(Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter) {
-    .Call(`_glmGamPoi2_estimate_overdispersions_lbfgs_fast`, Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter)
+estimate_global_overdispersions_fast_delayed <- function(Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, log_thetas, do_parallel = 0L) {
+    .Call(`_glmGamPoi2_estimate_global_overdispersions_fast_delayed`, Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, log_thetas, do_parallel)
 }
 
-estimate_overdispersions_lbfgs_fast_delayed <- function(Y, model_matrix, exp_offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter) {
-    .Call(`_glmGamPoi2_estimate_overdispersions_lbfgs_fast_delayed`, Y, model_matrix, exp_offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter)
+estimate_overdispersions_lbfgs_fast <- function(Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, do_parallel) {
+    .Call(`_glmGamPoi2_estimate_overdispersions_lbfgs_fast`, Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, do_parallel)
+}
+
+estimate_overdispersions_lbfgs_fast_delayed <- function(Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter, do_parallel = 0L) {
+    .Call(`_glmGamPoi2_estimate_overdispersions_lbfgs_fast_delayed`, Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter, do_parallel)
 }
 
 div_zbz_dbl <- function(a, b) {

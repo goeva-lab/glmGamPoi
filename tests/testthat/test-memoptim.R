@@ -1,7 +1,6 @@
 test_that("mem_optim$offset_as_vec doesn't change anything but offset matrix", {
   Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- ~ group + cont1 + cont2
 
   set.seed(1)
@@ -19,8 +18,7 @@ test_that("mem_optim$offset_as_vec doesn't change anything but offset matrix", {
 
 test_that("mem_optim$cast_dgC_Y_to_dgR doesn't change anything", {
   Y <- as(matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10), "CsparseMatrix")
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- ~ group + cont1 + cont2
 
   set.seed(1)
@@ -43,14 +41,13 @@ test_that("mem_optim$cast_dgC_Y_to_dgR doesn't change anything", {
 
   res_dgr[["Mu"]] <- as(res_dgr[["Mu"]], "CsparseMatrix")
   attr(res_dgr, "mem_optim") <- attr(res_dgc, "mem_optim")
-  expect_equal(res_dgr, res_dgc, tolerance = 1e-10)
+  expect_equal(res_dgr, res_dgc, tolerance = 1e-11)
 })
 
 
 test_that("mem_optim$mu_dropout_thresh doesn't change anything if set to value smaller than minimum of Mu", {
   Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- ~ group + cont1 + cont2
 
   set.seed(1)
@@ -69,8 +66,7 @@ test_that("mem_optim$mu_dropout_thresh doesn't change anything if set to value s
 
 test_that("mem_optim$do_parallel doesn't change anything", {
   Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- ~ group + cont1 + cont2
 
   set.seed(1)
@@ -84,4 +80,21 @@ test_that("mem_optim$do_parallel doesn't change anything", {
       expect_equal(res1, res2, tolerance = 0)
     }
   )
+})
+
+test_that("mem_optim$delay_mu doesn't change anything", {
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  design <- ~ group + cont1 + cont2
+
+  set.seed(1)
+  res1 <- glm_gp(Y, design = design, col_data = annot)
+
+  set.seed(1)
+  res2 <- glm_gp(Y, design = design, col_data = annot, mem_optim = list(delay_mu = TRUE))
+
+  res2[["Mu"]] <- res2[["Mu"]]()
+  attr(res2, "mem_optim") <- attr(res1, "mem_optim")
+
+  expect_equal(res1, res2, tolerance = 0)
 })
