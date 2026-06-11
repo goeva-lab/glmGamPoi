@@ -44,7 +44,7 @@ as.list.glmGamPoi2 <- function(x, ...){
 #' @export
 print.glmGamPoi2 <- tools::.print.via.format
 
-#' @rdname print.glmGamPoi
+#' @rdname print.glmGamPoi2
 #' @export
 format.glmGamPoi2 <- function(x, ...){
   string_builder <- ""
@@ -57,7 +57,7 @@ format.glmGamPoi2 <- function(x, ...){
   string_builder
 }
 
-#' @rdname print.glmGamPoi
+#' @rdname print.glmGamPoi2
 #' @export
 summary.glmGamPoi2 <- function(object, ...){
   ans <- object
@@ -65,11 +65,11 @@ summary.glmGamPoi2 <- function(object, ...){
   ans
 }
 
-#' @rdname print.glmGamPoi
+#' @rdname print.glmGamPoi2
 #' @export
 print.summary.glmGamPoi2 <- tools::.print.via.format
 
-#' @rdname print.glmGamPoi
+#' @rdname print.glmGamPoi2
 #' @export
 format.summary.glmGamPoi2 <- function(x, ...){
   header <- paste0(format.glmGamPoi2(x), "\n")

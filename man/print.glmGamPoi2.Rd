@@ -2,9 +2,21 @@
 % Please edit documentation in R/print_model.R
 \name{print.glmGamPoi2}
 \alias{print.glmGamPoi2}
+\alias{format.glmGamPoi2}
+\alias{summary.glmGamPoi2}
+\alias{print.summary.glmGamPoi2}
+\alias{format.summary.glmGamPoi2}
 \title{Pretty print the result from glm_gp()}
 \usage{
 \method{print}{glmGamPoi2}(x, ...)
+
+\method{format}{glmGamPoi2}(x, ...)
+
+\method{summary}{glmGamPoi2}(object, ...)
+
+\method{print}{summary.glmGamPoi2}(x, ...)
+
+\method{format}{summary.glmGamPoi2}(x, ...)
 }
 \arguments{
 \item{x}{the glmGamPoi object}

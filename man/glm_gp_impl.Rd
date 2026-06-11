@@ -14,7 +14,7 @@ glm_gp_impl(
   ridge_penalty = 0,
   do_cox_reid_adjustment = TRUE,
   subsample = FALSE,
-  mem_optim = handle_optim_parameter(FALSE),
+  perf_optim = handle_perf_optim_parameter(FALSE),
   verbose = FALSE
 )
 }
@@ -90,7 +90,7 @@ Default: \code{FALSE} which means that the data is not subsampled. If set to \co
 are considered. Otherwise the parameter just specifies the number of samples that are considered
 for each gene to estimate the overdispersion.}
 
-\item{mem_optim}{a value that indicates if attempts should be made to optimize memory use while fitting the GLM.
+\item{perf_optim}{a value that indicates if attempts should be made to optimize performance / memory use while fitting the GLM.
 Can be provided as a boolean (turns on/off all optimizations) or as a list to select only specific optimizations.
 Note: various optimizations here can lead to BREAKING changes in output shape and/or values,
 and were designed/intended for application on single-cell transcriptomics data (e.g. sparse matrix, with l.t. ~10\% density)
@@ -99,8 +99,16 @@ A list of currently specified optimizations is provided below:
 \item \code{offset_as_vec}: if \code{offset} is provided as either a constant or a vector of per-sample offsets,
 \code{Offset} will be a vector instead of a matrix to avoid generating a dense n_sample * n_genes matrix
 \item \code{mu_dropout_thresh}: if set to a numeric-like value greater than zero and \code{offset_as_vec} is enabled,
-then during \code{Mu} (prediction) matrix construction, values less than \code{mu_dropout_thresh} will
-be replaced with zeroes, and \code{Mu} will be constructed as a \link[Matrix:dgCMatrix-class]{dgCMatrix}
+then during \code{Mu} matrix construction, values less than \code{mu_dropout_thresh} will
+be replaced with zeroes, and \code{Mu} will be constructed as a \link[Matrix:dgCMatrix-class]{dgCMatrix},
+\item \code{cast_dgC_Y_to_dgR}: data matrix will be internally converted to row-major format to improve memory access patterns
+as internal steps fetch data row-wise on a per-gene basis
+\item \code{do_parallel}: if value greater than zero, then enables parallelization for model parameter fitting processes
+the number of threads used is equal to the provided integer
+\item \code{delay_mu}: Mu matrix is never explicitly formed, instead Mu field of output is provided as a function
+which can be called to materialize full matrix.
+IMPORTANT NOTE: \link{predict} and \link{residuals} methods will lead to a memory spike if this option is enabled, as they require the full Mu matrix to be present in memory.
+\item \code{use_lbfgs_impl}: uses the L-BFGS-B algorithm instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
 }
 Default: \code{FALSE}, meaning no optimizations are made}
 

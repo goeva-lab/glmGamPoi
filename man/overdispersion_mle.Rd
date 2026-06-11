@@ -12,7 +12,9 @@ overdispersion_mle(
   global_estimate = FALSE,
   subsample = FALSE,
   max_iter = 200,
-  verbose = FALSE
+  verbose = FALSE,
+  use_lbfgs_impl = FALSE,
+  do_parallel = 0
 )
 }
 \arguments{

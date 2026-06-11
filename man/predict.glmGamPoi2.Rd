@@ -10,7 +10,7 @@
   type = c("link", "response"),
   se.fit = FALSE,
   offset = mean(object$Offset),
-  mem_optim = attr(object, "mem_optim"),
+  perf_optim = attr(object, "perf_optim"),
   on_disk = NULL,
   verbose = FALSE,
   ...
@@ -52,7 +52,7 @@ results are. If \code{newdata} is \code{NULL}, the \code{offset} is ignored, bec
 a result based on the pre-calculated \code{object$Mu}. If \code{newdata} is not \code{NULL}, by default the
 \code{offset} is \code{mean(object$Offset)}, which puts the in the same size as the average sample.}
 
-\item{mem_optim}{see \code{\link[=glm_gp]{glm_gp()}} parameter of same name}
+\item{perf_optim}{see \code{\link[=glm_gp]{glm_gp()}} parameter of same name}
 
 \item{on_disk}{a boolean that indicates if the results are \code{HDF5Matrix}'s from the \code{HDF5Array}
 package. If \code{newdata} is \code{NULL}, \code{on_disk} is ignored. Otherwise, if \code{on_disk = NULL},
