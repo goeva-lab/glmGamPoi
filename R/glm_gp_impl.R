@@ -112,7 +112,11 @@ glm_gp_impl <- function(Y, model_matrix,
   # Make estimate of over-disperion
   if(isTRUE(overdispersion) || (is.character(overdispersion) && overdispersion == "global")){
     if(verbose){ message("Estimate dispersion") }
-    Mu_o <- if(is.function(Mu)) { list(offset_matrix = offset_matrix, beta_mat = Beta, fn = Mu) } else { Mu }
+    Mu_o <- if(is.function(Mu)) { list(
+      offset_matrix = if(is.vector(offset_matrix, mode = "numeric")){ matrix(offset_matrix, nrow = 1) }else{ offset_matrix },
+      beta_mat = Beta,
+      fn = Mu
+    )} else { Mu }
 
     if(isTRUE(overdispersion)){
 
