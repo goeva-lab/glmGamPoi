@@ -87,7 +87,7 @@
 #'   to reduce the memory usage. Processing in memory can be significantly faster than on disk.
 #'   Default: `NULL` which means that the data is only processed in memory if `data` is an in-memory
 #'   data structure.
-#' @param mem_optim a value that indicates if attempts should be made to optimize memory use while fitting the GLM.
+#' @param perf_optim a value that indicates if attempts should be made to optimize performance / memory use while fitting the GLM.
 #'   Can be provided as a boolean (turns on/off all optimizations) or as a list to select only specific optimizations.
 #'   Note: various optimizations here can lead to BREAKING changes in output shape and/or values,
 #'   and were designed/intended for application on single-cell transcriptomics data (e.g. sparse matrix, with l.t. ~10% density)
@@ -96,8 +96,16 @@
 #'     \item `offset_as_vec`: if `offset` is provided as either a constant or a vector of per-sample offsets,
 #'       `Offset` will be a vector instead of a matrix to avoid generating a dense n_sample * n_genes matrix
 #'     \item `mu_dropout_thresh`: if set to a numeric-like value greater than zero and `offset_as_vec` is enabled,
-#'        then during `Mu` (prediction) matrix construction, values less than `mu_dropout_thresh` will
-#'        be replaced with zeroes, and `Mu` will be constructed as a [dgCMatrix][Matrix::dgCMatrix-class]
+#'        then during `Mu` matrix construction, values less than `mu_dropout_thresh` will
+#'        be replaced with zeroes, and `Mu` will be constructed as a [dgCMatrix][Matrix::dgCMatrix-class],
+#'     \item `cast_dgC_Y_to_dgR`: data matrix will be internally converted to row-major format to improve memory access patterns
+#'        as internal steps fetch data row-wise on a per-gene basis
+#'     \item `do_parallel`: if value greater than zero, then enables parallelization for model parameter fitting processes
+#'        the number of threads used is equal to the provided integer
+#'     \item `delay_mu`: Mu matrix is never explicitly formed, instead Mu field of output is provided as a function
+#'        which can be called to materialize full matrix.
+#'        IMPORTANT NOTE: [predict] and [residual] methods will lead to a memory spike if this option is enabled, as they require the full Mu matrix to be present in memory.
+#'     \item `use_lbfgs_impl`: uses the L-BFGS-B algorithm instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
 #'   }
 #'   Default: `FALSE`, meaning no optimizations are made
 #' @param verbose a boolean that indicates if information about the individual steps are printed
@@ -239,7 +247,7 @@ glm_gp <- function(data,
                    subsample = FALSE,
                    on_disk = NULL,
                    use_assay = NULL,
-                   mem_optim = FALSE,
+                   perf_optim = FALSE,
                    verbose = FALSE){
 
   # Validate `data`
@@ -261,7 +269,7 @@ glm_gp <- function(data,
   col_data <- get_col_data(data, col_data)
   des <- handle_design_parameter(design, data, col_data, reference_level)
 
-  mem_optim <- handle_memoptim_parameter(mem_optim)
+  perf_optim <- handle_perf_optim_parameter(perf_optim)
 
   # Call glm_gp_impl()
   res <- glm_gp_impl(data_mat,
@@ -273,7 +281,7 @@ glm_gp <- function(data,
               ridge_penalty = ridge_penalty,
               do_cox_reid_adjustment = do_cox_reid_adjustment,
               subsample = subsample,
-              mem_optim = mem_optim,
+              perf_optim = perf_optim,
               verbose = verbose)
   # Make sure that the output is nice and beautiful
   rownames(data_mat) <- rownames(data)
@@ -312,7 +320,7 @@ glm_gp <- function(data,
   names(res$deviances) <- rownames(data)
   names(res$size_factors) <- colnames(data)
 
-  attr(res, "mem_optim") <- mem_optim
+  attr(res, "perf_optim") <- perf_optim
 
   class(res) <- "glmGamPoi2"
   res

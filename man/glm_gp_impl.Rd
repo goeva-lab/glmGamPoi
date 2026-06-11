@@ -14,7 +14,7 @@ glm_gp_impl(
   ridge_penalty = 0,
   do_cox_reid_adjustment = TRUE,
   subsample = FALSE,
-  mem_optim = handle_memoptim_parameter(FALSE),
+  mem_optim = handle_optim_parameter(FALSE),
   verbose = FALSE
 )
 }

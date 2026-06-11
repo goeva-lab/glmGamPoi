@@ -41,7 +41,7 @@
 #'   the result is calculated on disk depending if `offset` is stored on disk.
 #' @param verbose a boolean that indicates if information about the individual steps are
 #'   printed while predicting. Default: `FALSE`.
-#' @param mem_optim see [glm_gp()] parameter of same name
+#' @param perf_optim see [glm_gp()] parameter of same name
 #' @param ... currently ignored.
 #'
 #' @details
@@ -111,7 +111,7 @@ predict.glmGamPoi2 <- function(object, newdata = NULL,
                               type = c("link", "response"),
                               se.fit = FALSE,
                               offset = mean(object$Offset),
-                              mem_optim = attr(object, "mem_optim"),
+                              perf_optim = attr(object, "perf_optim"),
                               on_disk = NULL, verbose = FALSE,
                               ...){
 
@@ -163,9 +163,9 @@ predict.glmGamPoi2 <- function(object, newdata = NULL,
     }
 
     offset_matrix <- handle_offset_param_for_predict(offset, nrow = nrow(object$Beta),
-                                    ncol = nrow(design_matrix), on_disk = on_disk, offset_as_vec = mem_optim[["offset_as_vec"]])
+                                    ncol = nrow(design_matrix), on_disk = on_disk, offset_as_vec = perf_optim[["offset_as_vec"]])
     if(verbose) message("Calculate 'Mu = exp(object$Beta %*% t(design_matrix) + Offset)'")
-    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix, mem_optim[["mu_dropout_thresh"]], mem_optim[["cast_dgC_Y_to_dgR"]])
+    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
     rownames(Mu) <- rownames(object$Beta)
     colnames(Mu) <- mu_colnames
   }

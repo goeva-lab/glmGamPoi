@@ -126,10 +126,9 @@ inline void fitBeta_FS_optim_step(
     const double theta, const int max_iter) {
   LBFGSpp::LBFGSParam params;
   params.max_iterations = max_iter;
-  // using numerical approximation of derivative, gradient based stopping point is not desirable
+  // using delta-based stopping condition instead of gradient value
   params.epsilon = 0;
   params.epsilon_rel = 0;
-  // using delta based stopping point instead, delta value determined through some manual testing
   params.past = 1;
   params.delta = 1e-12;
   // NocedalWright linesearch fails to find value, using MoreThuente instead

@@ -157,7 +157,7 @@ List estimate_overdispersions_fast_delayed(RObject Y, const Eigen::Map<Eigen::Ma
 
     const Map<const VectorXd> counts_v(cptr, n_samples), off_v(optr, n_samples);
     Map<VectorXd> mu_v(mu.begin(), n_samples);
-    mu_v = calculate_mu_add<VectorXd>(counts_v, beta_mat_v.row(gene_idx), off_v);
+    mu_v = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off_v);
 
     // Check if the first value is NA, if yes all of them will be
     if (n_samples > 0 && std::isnan(mu[0])) {
@@ -265,7 +265,7 @@ NumericVector estimate_global_overdispersions_fast_delayed(RObject Y, const Eige
       const Map<const VectorXd> counts_v(cptr, n_samples), off_v(optr, n_samples);
 
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
-      const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx), off_v);
+      const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off_v);
 
       const auto tab = make_map_if_small(counts_v, /*stop_if_larger = */ n_samples / 2);
       VectorXd unique_counts(tab.size()), count_frequencies(tab.size());
@@ -447,7 +447,7 @@ List estimate_overdispersions_lbfgs_fast_delayed(const RObject Y, const Eigen::M
         const VectorXd off_s = off_v(idx_s);
         const MatrixXd mm_s = model_matrix(idx_s, Eigen::all);
 
-        const auto mu = calculate_mu_add<VectorXd>(mm_s, beta_mat_v.row(gene_idx), off_s);
+        const auto mu = calculate_mu_add<VectorXd>(mm_s, beta_mat_v.row(gene_idx).transpose(), off_s);
         if (n_samples > 0 && std::isnan(mu(0))) {
           estimates[gene_idx] = NAN;
           iterations[gene_idx] = max_iter;
@@ -457,7 +457,7 @@ List estimate_overdispersions_lbfgs_fast_delayed(const RObject Y, const Eigen::M
         lbfgs_overdispersion_mle_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_s, mu, mm_s, do_cox_reid_adjustment,
                                       max_iter);
       } else {
-        const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx), off);
+        const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off);
         if (n_samples > 0 && std::isnan(mu(0))) {
           estimates[gene_idx] = NAN;
           iterations[gene_idx] = max_iter;

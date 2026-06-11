@@ -75,7 +75,7 @@
 #' @seealso [glm_gp()]
 #' @export
 #' @importFrom beachmat initializeCpp
-overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustment = !is.null(model_matrix), global_estimate = FALSE, subsample = FALSE, max_iter = 200, verbose = FALSE, use_lbfgsb_impl = FALSE, do_parallel = 0) {
+overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustment = !is.null(model_matrix), global_estimate = FALSE, subsample = FALSE, max_iter = 200, verbose = FALSE, use_lbfgs_impl = FALSE, do_parallel = 0) {
   # Validate n_subsampling
   stopifnot(length(subsample) == 1, subsample >= 0)
   if (isFALSE(subsample)) {
@@ -104,14 +104,14 @@ overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustm
     } else {
       # This function calls overdispersion_mle() for each row, but is faster than a vapply()
       if (is.list(mean)) {
-        (if (use_lbfgsb_impl) {
+        (if (use_lbfgs_impl) {
           function(...) estimate_overdispersions_lbfgs_fast_delayed(..., do_parallel = do_parallel)
         } else {
           estimate_overdispersions_fast_delayed
-        })(initializeCpp(y), model_matrix, mean[["offset_matrix"]], mean[["beta_mat"]], do_cox_reid_adjustment, n_subsamples, max_iter)
+        })(initializeCpp(y), model_matrix, initializeCpp(mean[["offset_matrix"]]), mean[["beta_mat"]], do_cox_reid_adjustment, n_subsamples, max_iter)
       } else {
-        (if (use_lbfgsb_impl) {
-          function(...) estimate_overdispersions_lbfgs_fast_delayed(..., do_parallel = do_parallel)
+        (if (use_lbfgs_impl) {
+          function(...) estimate_overdispersions_lbfgs_fast(..., do_parallel = do_parallel)
         } else {
           estimate_overdispersions_fast
         })(initializeCpp(y), initializeCpp(mean), model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter)
@@ -256,7 +256,7 @@ estimate_global_overdispersion <- function(Y, Mu, model_matrix, do_cox_reid_adju
   # The runtime is linear with the number of `log_thetas`
   log_thetas <- seq(-6, 1, length.out = 10)
   log_likes <- if (is.list(Mu)) {
-    estimate_global_overdispersions_fast_delayed(initializeCpp(Y), model_matrix, Mu[["offset_matrix"]], Mu[["beta_mat"]], do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
+    estimate_global_overdispersions_fast_delayed(initializeCpp(Y), model_matrix, initializeCpp(Mu[["offset_matrix"]]), Mu[["beta_mat"]], do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
   } else {
     estimate_global_overdispersions_fast(initializeCpp(Y), initializeCpp(Mu), model_matrix, do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
   }

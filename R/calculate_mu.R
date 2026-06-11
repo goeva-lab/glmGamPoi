@@ -94,7 +94,7 @@ calculate_mu <- local({
 mk_delayed_mu <- function(Beta, model_matrix, offset, dropout_thresh, dropout_by_row) {
   function(obs = NULL, feats = NULL) {
     if(!is.null(feats)){
-      stopifnot(is.integer(feats) && all(feats > 0 & feats <= nrow(model_matrix)))
+      stopifnot(is.integer(feats) && all(feats > 0 & feats <= nrow(Beta)))
       Beta <- Beta[feats, ]
       if(!is.vector(offset)){
         offset <- offset[feats, ]

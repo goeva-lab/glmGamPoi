@@ -226,13 +226,14 @@ div_mtx_colwise <- function(lhs, rhs) {
   sweep(lhs, 2, rhs, `/`)
 }
 
-handle_memoptim_parameter <- function(param) {
+handle_perf_optim_parameter <- function(param) {
   default_opts <- list(
     "offset_as_vec" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
     "mu_dropout_thresh" = list(0, function(e) (is.numeric(e) && (length(e) == 1)), "numeric of length 1"),
     "cast_dgC_Y_to_dgR" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
     "do_parallel" = list(0L, function(e) (is.integer(e) && (length(e) == 1)), "integer of length 1"),
-    "delay_mu" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
+    "delay_mu" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
+    "use_lbfgs_impl" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
   )
 
   out <- if(is.logical(param) && (length(param) == 1)){
@@ -241,13 +242,14 @@ handle_memoptim_parameter <- function(param) {
       "mu_dropout_thresh" = as.numeric(param),
       "cast_dgC_Y_to_dgR" = param,
       "do_parallel" = as.integer(param),
-      "delay_mu" = param
+      "delay_mu" = param,
+      "use_lbfgs_impl" = param
     )
   }else if(is.list(param) && (length(union(names(default_opts), names(param)))) == length(default_opts)){
     for(nm in names(param)){
       if(!default_opts[[nm]][[2]](param[[nm]])){
         stop(sprintf(
-          "got mem_optim parameter (`%s`, at index - `%s`) of wrong type/shape, must be %s",
+          "got perf_optim parameter (`%s`, at index - `%s`) of wrong type/shape, must be %s",
           param[[nm]],
           nm,
           default_opts[[nm]][[3]]
@@ -257,11 +259,19 @@ handle_memoptim_parameter <- function(param) {
     utils::modifyList(lapply(default_opts, function(e) e[[1]]), param)
   }else{
     stop(sprintf(
-      "got mem_optim parameter (`%s`) of wrong type/shape, must be list with names `%s` (or a subset thereof) or logical of length 1",
+      "got perf_optim parameter (`%s`) of wrong type/shape, must be list with names `%s` (or a subset thereof) or logical of length 1",
       paste0(sprintf("%s=%s", names(param), param), collapse = ", "),
       paste0(names(default_opts), collapse = ", ")
     ))
   }
 
   out
+}
+
+handle_Mu_rowmeans <- function(Mu, n.rows) {
+  if (is.function(Mu)) {
+    vapply(seq_len(n.rows), function(i) mean(Mu(feats = i)), numeric(1))
+  } else {
+    DelayedMatrixStats::rowMeans2(Mu)
+  }
 }

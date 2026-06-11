@@ -12,7 +12,7 @@ using Eigen::MatrixXd;
 using Eigen::Vector;
 using Eigen::VectorXd;
 
-#include <LBFGSpp/include/LBFGSB.h>
+#include <LBFGSpp/include/LBFGS.h>
 
 // This correction factor is necessary to avoid estimates of
 // theta that are basically +Inf. The problem is that for
@@ -225,6 +225,7 @@ template <class D1> inline std::unordered_map<long, size_t> make_map_if_small(co
   return counts;
 }
 
+#include<iostream>
 template <class D1, class D2, class D3, class D4, class D5> class GPMLE {
 private:
   const EMB<D1> &y;
@@ -286,20 +287,18 @@ inline void lbfgs_overdispersion_mle_impl(double &est, int &iters_out, std::stri
     start_value = 0.5;
   }
 
-  LBFGSpp::LBFGSBParam params;
+  LBFGSpp::LBFGSParam params;
   params.max_iterations = max_iter;
-  LBFGSpp::LBFGSBSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
+  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
 
   VectorXd x = Vector<double, 1>::Constant(std::log(start_value));
   double fx;
-  const auto lb = Vector<double, 1>::Constant(1e-16);
-  const auto ub = Vector<double, 1>::Constant(1e16);
   const GPMLE fn(y, mean_vec_clamp, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
-  int iters = solver.minimize(fn, x, fx, lb, ub);
+  int iters = solver.minimize(fn, x, fx);
 
   if (do_cox_reid_adjustment && (iters == max_iter)) {
     const GPMLE fn(y, mean_vec_clamp, model_matrix, false, unique_counts, count_frequencies);
-    iters = solver.minimize(fn, x, fx, lb, ub);
+    iters = solver.minimize(fn, x, fx);
   }
 
   est = std::exp(x(0));
