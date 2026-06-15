@@ -1,10 +1,6 @@
 #ifndef FIT_BETA_H
 #define FIT_BETA_H
 
-#include "LBFGSpp/include/LBFGSpp/LineSearchBacktracking.h"
-#include "LBFGSpp/include/LBFGSpp/LineSearchMoreThuente.h"
-#include "LBFGSpp/include/LBFGSpp/LineSearchNocedalWright.h"
-#include "LBFGSpp/include/LBFGSpp/Param.h"
 #include <calc_helpers.h>
 #include <deviance_eigen.h>
 #include <fisher_scoring_steps_eigen.h>
@@ -131,8 +127,10 @@ inline void fitBeta_FS_optim_step(
   params.epsilon_rel = 0;
   params.past = 1;
   params.delta = 1e-12;
+  params.max_linesearch = 1024;
+  params.linesearch = LBFGSpp::LBFGS_LINESEARCH_BACKTRACKING_ARMIJO;
   // NocedalWright linesearch fails to find value, using MoreThuente instead
-  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
+  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchBracketing> solver(params);
 
   // default used by the Eigen::NumericalDiff module 
   const auto eps = SQRT_DBL_EPS;

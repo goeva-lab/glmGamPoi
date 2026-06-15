@@ -16,19 +16,10 @@ using Eigen::VectorXd;
 #include "Rtatami.h"
 
 // [[Rcpp::export]]
-List make_table_if_small(const NumericVector &x, int stop_if_larger) {
-  std::unordered_map<long, size_t> counts;
-  counts.reserve(stop_if_larger);
-  for (double v : x) {
-    ++counts[(long)v];
-    if (counts.size() > stop_if_larger) {
-      return List::create(NumericVector::create(), NumericVector::create());
-    }
-  }
-  NumericVector keys(counts.size());
-  NumericVector values(counts.size());
-  transform(counts.begin(), counts.end(), keys.begin(), [](std::pair<int, size_t> pair) { return (double)pair.first; });
-  transform(counts.begin(), counts.end(), values.begin(), [](std::pair<int, size_t> pair) { return (double)pair.second; });
+List make_table_if_small(const NumericVector x, int stop_if_larger) {
+  VectorXd keys, values;
+
+  make_map_if_small(keys, values, x, stop_if_larger);
   return List::create(keys, values);
 }
 
@@ -204,14 +195,9 @@ NumericVector estimate_global_overdispersions_fast(RObject Y, RObject mean_matri
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
       const Map<const VectorXd> counts_v(cptr, n_samples), mu_v(mptr, n_samples);
 
-      const auto tab = make_map_if_small(counts_v, /*stop_if_larger = */ n_samples / 2);
-      VectorXd unique_counts(tab.size()), count_frequencies(tab.size());
-      int i = 0;
-      for (auto p : tab) {
-        unique_counts(i) = (double)p.first;
-        count_frequencies(i) = (double)p.second;
-        i++;
-      }
+      VectorXd unique_counts, count_frequencies;
+      make_map_if_small(unique_counts, count_frequencies, counts_v, /*stop_if_larger = */ n_samples / 2);
+      
 
       for (int point_idx = 0; point_idx < n_spline_points; point_idx++) {
         log_likelihoods[point_idx] += conventional_loglikelihood_fast_impl(counts_v, mu_v, log_thetas[point_idx], model_matrix,
@@ -267,14 +253,8 @@ NumericVector estimate_global_overdispersions_fast_delayed(RObject Y, const Eige
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
       const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off_v);
 
-      const auto tab = make_map_if_small(counts_v, /*stop_if_larger = */ n_samples / 2);
-      VectorXd unique_counts(tab.size()), count_frequencies(tab.size());
-      int i = 0;
-      for (auto p : tab) {
-        unique_counts(i) = (double)p.first;
-        count_frequencies(i) = (double)p.second;
-        i++;
-      }
+      VectorXd unique_counts, count_frequencies;
+      make_map_if_small(unique_counts, count_frequencies, counts_v, /*stop_if_larger = */ n_samples / 2);
 
       for (int point_idx = 0; point_idx < n_spline_points; point_idx++) {
         log_likelihoods[point_idx] += conventional_loglikelihood_fast_impl(counts_v, mu, log_thetas[point_idx], model_matrix, do_cox_reid_adjustment,

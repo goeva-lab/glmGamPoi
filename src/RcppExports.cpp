@@ -196,12 +196,12 @@ BEGIN_RCPP
 END_RCPP
 }
 // make_table_if_small
-List make_table_if_small(const NumericVector& x, int stop_if_larger);
+List make_table_if_small(const NumericVector x, int stop_if_larger);
 RcppExport SEXP _glmGamPoi2_make_table_if_small(SEXP xSEXP, SEXP stop_if_largerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const NumericVector& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< const NumericVector >::type x(xSEXP);
     Rcpp::traits::input_parameter< int >::type stop_if_larger(stop_if_largerSEXP);
     rcpp_result_gen = Rcpp::wrap(make_table_if_small(x, stop_if_larger));
     return rcpp_result_gen;

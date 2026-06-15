@@ -169,7 +169,7 @@ inline double conventional_deriv_score_function_fast_impl(const EMB<D1> &y, cons
     const MatrixXd db = model_matrix.transpose() * (model_matrix.array().colwise() * (-w_diag.square())).matrix();
     const MatrixXd d2b = model_matrix.transpose() * (model_matrix.array().colwise() * (2 * w_diag.cube())).matrix();
 
-    // The diag(1e-6) protects against singular matrices    
+    // The diag(1e-6) protects against singular matrices
     MatrixXd b_inv = MatrixXd::Identity(b.rows(), b.cols());
     b.diagonal().array() += 1e-6;
     b.llt().solveInPlace(b_inv);
@@ -213,19 +213,30 @@ inline double conventional_deriv_score_function_fast_impl(const EMB<D1> &y, cons
   return res;
 }
 
-template <class D1> inline std::unordered_map<long, size_t> make_map_if_small(const EMB<D1> &x, const int stop_if_larger) {
-  std::unordered_map<long, size_t> counts;
-  counts.reserve(stop_if_larger);
+// not using Eigen::MatrixBase as base class here to have access to resize method
+template <class V1, class V2, class V3>
+inline void make_map_if_small(V1 &unique_counts_out, V2 &freqs_out, const V3 &x, const int stop_if_larger) {
+  std::unordered_map<long, double> count_tab;
+  count_tab.reserve(stop_if_larger);
   for (auto v : x) {
-    ++counts[(long)v];
-    if (counts.size() > stop_if_larger) {
-      return std::unordered_map<long, size_t>();
+    ++count_tab[(long)v];
+    if (count_tab.size() > stop_if_larger) {
+      return;
     }
   }
-  return counts;
+
+  // assuming whatever vector type V1 and V2 are, they have a resize method
+  unique_counts_out.resize(count_tab.size());
+  freqs_out.resize(count_tab.size());
+
+  int i = 0;
+  for (auto p : count_tab) {
+    unique_counts_out[i] = p.first;
+    freqs_out[i] = p.second;
+    i++;
+  }
 }
 
-#include<iostream>
 template <class D1, class D2, class D3, class D4, class D5> class GPMLE {
 private:
   const EMB<D1> &y;
@@ -263,16 +274,11 @@ inline void lbfgs_overdispersion_mle_impl(double &est, int &iters_out, std::stri
     }
   });
 
-  const auto tab = make_map_if_small(y, /*stop_if_larger = */ y.size() / 2);
-  VectorXd unique_counts(tab.size()), count_frequencies(tab.size());
-  int i = 0;
-  for (auto p : tab) {
-    unique_counts(i) = (double)p.first;
-    count_frequencies(i) = (double)p.second;
-    i++;
-  }
+  VectorXd unique_counts, count_frequencies;
+  make_map_if_small(unique_counts, count_frequencies, y, y.size() / 2);
+  
   const double far_left_value = conventional_score_function_fast_impl(y, mean_vec_clamp, std::log(1e-8), model_matrix, do_cox_reid_adjustment,
-                                                                unique_counts, count_frequencies);
+                                                                      unique_counts, count_frequencies);
 
   if (far_left_value < 0) {
     est = 0;
@@ -289,7 +295,9 @@ inline void lbfgs_overdispersion_mle_impl(double &est, int &iters_out, std::stri
 
   LBFGSpp::LBFGSParam params;
   params.max_iterations = max_iter;
-  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
+  params.max_linesearch = 1024;
+  params.linesearch = LBFGSpp::LBFGS_LINESEARCH_BACKTRACKING_ARMIJO;
+  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchBracketing> solver(params);
 
   VectorXd x = Vector<double, 1>::Constant(std::log(start_value));
   double fx;
