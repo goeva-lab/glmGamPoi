@@ -48,8 +48,8 @@ print.glmGamPoi2 <- tools::.print.via.format
 #' @export
 format.glmGamPoi2 <- function(x, ...){
   string_builder <- ""
-  nrow <- nrow(x$Mu)
-  ncol <- ncol(x$Mu)
+  nrow <- nrow(x$data)
+  ncol <- ncol(x$data)
   npara <- ncol(x$Beta)
   string_builder <- paste0(string_builder, "glmGamPoiFit object:\n",
                            "The data had ", nrow, " rows and ", ncol, " columns.\n",
@@ -73,8 +73,8 @@ print.summary.glmGamPoi2 <- tools::.print.via.format
 #' @export
 format.summary.glmGamPoi2 <- function(x, ...){
   header <- paste0(format.glmGamPoi2(x), "\n")
-  nrow <- nrow(x$Mu)
-  ncol <- ncol(x$Mu)
+  nrow <- nrow(x$data)
+  ncol <- ncol(x$data)
   npara <- ncol(x$Beta)
   ndigits <- 3
 
