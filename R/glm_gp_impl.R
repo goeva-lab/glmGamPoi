@@ -123,13 +123,13 @@ glm_gp_impl <- function(Y, model_matrix,
       disp_est <- overdispersion_mle(Y, Mu_o, model_matrix = model_matrix,
                                      do_cox_reid_adjustment = do_cox_reid_adjustment,
                                      subsample = subsample, verbose = verbose,
-                                     do_parallel = perf_optim[["do_parallel"]], use_lbfgs_impl = perf_optim[["use_lbfgs_impl"]])$estimate
+                                     do_parallel = perf_optim[["do_parallel"]], use_nr_overdisp_impl = perf_optim[["use_nr_overdisp_impl"]])$estimate
     }else if(is.character(overdispersion) && overdispersion == "global"){
       disp_est <- overdispersion_mle(Y, Mu_o, model_matrix = model_matrix,
                                      do_cox_reid_adjustment = do_cox_reid_adjustment,
                                      global_estimate = TRUE,
                                      subsample = subsample, verbose = verbose,
-                                     do_parallel = perf_optim[["do_parallel"]], use_lbfgs_impl = perf_optim[["use_lbfgs_impl"]])$estimate
+                                     do_parallel = perf_optim[["do_parallel"]], use_nr_overdisp_impl = perf_optim[["use_nr_overdisp_impl"]])$estimate
       disp_est <- rep(disp_est, times = nrow(Y))
     }
 

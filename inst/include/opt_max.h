@@ -3,7 +3,6 @@
 
 #include <cfloat>
 #include <cmath>
-#include <functional>
 
 /* below is an adapted version of `Brent_fmin` taken from `src/library/stats/optimize.c` of the R source repo @ trunk 89985
  * it is only very lightly adapted to:

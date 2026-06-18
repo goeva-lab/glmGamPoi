@@ -105,7 +105,7 @@
 #'     \item `delay_mu`: Mu matrix is never explicitly formed, instead Mu field of output is provided as a function
 #'        which can be called to materialize full matrix.
 #'        IMPORTANT NOTE: [predict] and [residuals] methods will lead to a memory spike if this option is enabled, as they require the full Mu matrix to be present in memory.
-#'     \item `use_lbfgs_impl`: uses the L-BFGS-B algorithm instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
+#'     \item `use_nr_overdisp_impl`: uses a C++-implemented newton-raphson procedure instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
 #'   }
 #'   Default: `FALSE`, meaning no optimizations are made
 #' @param verbose a boolean that indicates if information about the individual steps are printed

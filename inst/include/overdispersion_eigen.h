@@ -12,8 +12,6 @@ using Eigen::MatrixXd;
 using Eigen::Vector;
 using Eigen::VectorXd;
 
-#include <LBFGSpp/include/LBFGS.h>
-
 // This correction factor is necessary to avoid estimates of
 // theta that are basically +Inf. The problem is that for
 // some combination of the y, mu, and X the term
@@ -214,8 +212,7 @@ inline double conventional_deriv_score_function_fast_impl(const EMB<D1> &y, cons
 }
 
 // not using Eigen::MatrixBase as base class here to have access to resize method
-template <class V1, class V2, class V3>
-inline void make_map_if_small(V1 &unique_counts_out, V2 &freqs_out, const V3 &x, const int stop_if_larger) {
+template <class V1, class V2, class V3> inline void make_map_if_small(V1 &unique_counts_out, V2 &freqs_out, const V3 &x, const int stop_if_larger) {
   std::unordered_map<long, double> count_tab;
   count_tab.reserve(stop_if_larger);
   for (auto v : x) {
@@ -237,48 +234,81 @@ inline void make_map_if_small(V1 &unique_counts_out, V2 &freqs_out, const V3 &x,
   }
 }
 
-template <class D1, class D2, class D3, class D4, class D5> class GPMLE {
-private:
-  const EMB<D1> &y;
-  const EMB<D2> &mean_vector;
-  const EMB<D3> &model_matrix;
-  const bool &do_cox_reid_adjustment;
-  const EMB<D4> &unique_counts;
-  const EMB<D5> &count_frequencies;
+template <class D1, class D2, class D3, class D4, class D5>
+inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, const EMB<D2> &mean_vector, const EMB<D3> &model_matrix,
+                      const bool do_cox_reid_adjustment, const double tol, const double eps, const EMB<D4> &unique_counts,
+                      const EMB<D5> &count_frequencies) {
+  const int max_iter = iters_out;
 
-public:
-  GPMLE(const EMB<D1> &y_, const EMB<D2> &mean_vector_, const EMB<D3> &model_matrix_, const bool &do_cox_reid_adjustment_,
-        const EMB<D4> &unique_counts_, const EMB<D5> &count_frequencies_)
-      : y(y_), mean_vector(mean_vector_), model_matrix(model_matrix_), do_cox_reid_adjustment(do_cox_reid_adjustment_), unique_counts(unique_counts_),
-        count_frequencies(count_frequencies_) {};
-  inline double operator()(const VectorXd &x, VectorXd &grad) const {
-    auto e = x(0);
-    grad(0) = -conventional_score_function_fast_impl(y, mean_vector, e, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
-    return -conventional_loglikelihood_fast_impl(y, mean_vector, e, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
+  int iter = 0;
+  double step_size;
+  for (; iter < max_iter; iter++) {
+    const auto grad =
+        conventional_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
+    const auto hess = conventional_deriv_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts,
+                                                                  count_frequencies);
+
+    const auto step = grad / hess;
+    log_theta_out -= step;
+
+    if (std::fabs(step) < tol) {
+      step_size = 2. / std::fabs(hess);
+      break;
+    }
   }
-};
+
+  // analytical derivative zero sometimes disagrees w/ optimum of objective (in the cox-reid adjustment case especially)
+  // as such, we proceed w/ a numerical derivative gradient ascent based adjustment of our newton-raphson result
+  // the initial step size is estimated from the double of the inverse of the hessian from the newton-raphson step
+  // even though we can't necessarily trust that output entirely, it should still serve as a useful guide (?)
+  for (; iter < max_iter; iter++) {
+    const auto v1 = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out + eps, model_matrix, do_cox_reid_adjustment, unique_counts,
+                                                         count_frequencies);
+    const auto v2 = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out - eps, model_matrix, do_cox_reid_adjustment, unique_counts,
+                                                         count_frequencies);
+    const auto dir = (v1 - v2) / (2 * eps);
+    auto step = dir * step_size;
+
+    if (std::fabs(step) < tol) {
+      break;
+    }
+
+    const auto cur_val =
+        conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
+    auto cand = log_theta_out + step;
+
+    // find step in numerical derivative direction that _actually_ increases the objective
+    while (conventional_loglikelihood_fast_impl(y, mean_vector, cand, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies) <
+           cur_val) {
+      step_size *= 0.618033988749;
+      cand = log_theta_out + dir * step_size;
+    }
+    log_theta_out = cand;
+
+    // decrease step size slightly for next iteration
+    step_size *= 0.95;
+  }
+
+  iters_out = iter;
+}
 
 template <class D1, class D2, class D3>
-inline void lbfgs_overdispersion_mle_impl(double &est, int &iters_out, std::string &msg, const EMB<D1> &y, const EMB<D2> &mean_vector,
-                                          const EMB<D3> &model_matrix, bool do_cox_reid_adjustment, int max_iter) {
+inline void overdispersion_mle_NR_impl(double &est, int &iters_out, std::string &msg, const EMB<D1> &y, const EMB<D2> &mean_vector,
+                                       const EMB<D3> &model_matrix, const bool do_cox_reid_adjustment, const int max_iter, const double tol) {
   if (y.isZero()) {
     est = 0;
     msg = "All counts y are 0";
     iters_out = 0;
   }
-  const VectorXd mean_vec_clamp = mean_vector.unaryExpr([](double x) -> double {
-    if (x == 0) {
-      return 1e-6;
-    } else {
-      return x;
-    }
-  });
+
+  // replace zeroes w/ 1e-6 because zeroes can cause issues (with approximate accuracy of 1e-32)
+  const VectorXd mean_vec_clamp = (mean_vector.array() >= 1e-32).select(mean_vector, 1e-6);
 
   VectorXd unique_counts, count_frequencies;
   make_map_if_small(unique_counts, count_frequencies, y, y.size() / 2);
-  
-  const double far_left_value = conventional_score_function_fast_impl(y, mean_vec_clamp, std::log(1e-8), model_matrix, do_cox_reid_adjustment,
-                                                                      unique_counts, count_frequencies);
+
+  const double far_left_value =
+      conventional_score_function_fast_impl(y, mean_vec_clamp, -20, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
 
   if (far_left_value < 0) {
     est = 0;
@@ -287,30 +317,25 @@ inline void lbfgs_overdispersion_mle_impl(double &est, int &iters_out, std::stri
   }
 
   const auto mu = y.mean();
-  auto start_value = ((y.array() - mu).square().mean() - mu) / (mu * mu);
+  auto log_theta = ((y.array() - mu).square().mean() - mu) / (mu * mu);
 
-  if (std::isnan(start_value) || start_value <= 0) {
-    start_value = 0.5;
+  if (std::isnan(log_theta) || log_theta <= 0) {
+    log_theta = 0.5;
   }
 
-  LBFGSpp::LBFGSParam params;
-  params.max_iterations = max_iter;
-  params.max_linesearch = 1024;
-  params.linesearch = LBFGSpp::LBFGS_LINESEARCH_BACKTRACKING_ARMIJO;
-  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchBracketing> solver(params);
+  log_theta = std::log(log_theta);
+  iters_out = max_iter;
 
-  VectorXd x = Vector<double, 1>::Constant(std::log(start_value));
-  double fx;
-  const GPMLE fn(y, mean_vec_clamp, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
-  int iters = solver.minimize(fn, x, fx);
+  // try to optimize theta
+  opt_theta(log_theta, iters_out, y, mean_vec_clamp, model_matrix, do_cox_reid_adjustment, tol, SQRT_DBL_EPS, unique_counts, count_frequencies);
 
-  if (do_cox_reid_adjustment && (iters == max_iter)) {
-    const GPMLE fn(y, mean_vec_clamp, model_matrix, false, unique_counts, count_frequencies);
-    iters = solver.minimize(fn, x, fx);
+  // if failed and cox-reid adjustment is used: try w/o cox-reid adjustment
+  if (do_cox_reid_adjustment && (iters_out == max_iter)) {
+    msg = "Estimated overdispersion w/o cox-reid adjustment";
+    opt_theta(log_theta, iters_out, y, mean_vec_clamp, model_matrix, false, tol, SQRT_DBL_EPS, unique_counts, count_frequencies);
   }
 
-  est = std::exp(x(0));
-  iters_out = iters;
+  est = std::exp(log_theta);
 }
 
 #endif

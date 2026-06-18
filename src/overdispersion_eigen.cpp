@@ -54,11 +54,9 @@ double conventional_deriv_score_function_fast(const NumericVector y, const Eigen
   return conventional_deriv_score_function_fast_impl(y_v, mu, log_theta, model_matrix, do_cr_adj, unique_counts_v, count_frequencies_v);
 }
 
-// ------------------------------------------------------------------------------------------------
-
 // [[Rcpp::export]]
-List estimate_overdispersions_fast(RObject Y, RObject mean_matrix, NumericMatrix model_matrix, bool do_cox_reid_adjustment, double n_subsamples,
-                                   int max_iter) {
+List estimate_overdispersions_fast(const RObject Y, const RObject mean_matrix, const NumericMatrix model_matrix, const bool do_cox_reid_adjustment,
+                                   const double n_subsamples, const int max_iter) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
   Rtatami::BoundNumericPointer mean_mat_bm_ptr(mean_matrix);
@@ -80,8 +78,7 @@ List estimate_overdispersions_fast(RObject Y, RObject mean_matrix, NumericMatrix
   NumericVector counts(n_samples), mu(n_samples);
 
   // This is calling back to R, which simplifies my code a lot
-  const Environment glmGamPoiEnv = Environment::namespace_env("glmGamPoi");
-  const Function overdispersion_mle_impl = glmGamPoiEnv["overdispersion_mle_impl"];
+  const Function overdispersion_mle_impl("overdispersion_mle_impl");
   for (int gene_idx = 0; gene_idx < n_genes; gene_idx++) {
     if (gene_idx % 100 == 0)
       checkUserInterrupt();
@@ -108,9 +105,9 @@ List estimate_overdispersions_fast(RObject Y, RObject mean_matrix, NumericMatrix
 }
 
 // [[Rcpp::export]]
-List estimate_overdispersions_fast_delayed(RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, RObject offset_matrix,
-                                           const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, bool do_cox_reid_adjustment, int n_subsamples,
-                                           int max_iter) {
+List estimate_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
+                                           const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const bool do_cox_reid_adjustment, const int n_subsamples,
+                                           const int max_iter) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
 
@@ -135,8 +132,7 @@ List estimate_overdispersions_fast_delayed(RObject Y, const Eigen::Map<Eigen::Ma
   VectorXd off(n_samples);
 
   // This is calling back to R, which simplifies my code a lot
-  const Environment glmGamPoiEnv = Environment::namespace_env("glmGamPoi");
-  const Function overdispersion_mle_impl = glmGamPoiEnv["overdispersion_mle_impl"];
+  const Function overdispersion_mle_impl("overdispersion_mle_impl");
   for (int gene_idx = 0; gene_idx < n_genes; gene_idx++) {
     if (gene_idx % 100 == 0)
       Rcpp::checkUserInterrupt();
@@ -166,7 +162,7 @@ List estimate_overdispersions_fast_delayed(RObject Y, const Eigen::Map<Eigen::Ma
 }
 
 // [[Rcpp::export]]
-NumericVector estimate_global_overdispersions_fast(RObject Y, RObject mean_matrix, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
+NumericVector estimate_global_overdispersions_fast(const RObject Y, const RObject mean_matrix, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
                                                    const bool do_cox_reid_adjustment, const NumericVector log_thetas, const int do_parallel = 0) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
@@ -197,7 +193,6 @@ NumericVector estimate_global_overdispersions_fast(RObject Y, RObject mean_matri
 
       VectorXd unique_counts, count_frequencies;
       make_map_if_small(unique_counts, count_frequencies, counts_v, /*stop_if_larger = */ n_samples / 2);
-      
 
       for (int point_idx = 0; point_idx < n_spline_points; point_idx++) {
         log_likelihoods[point_idx] += conventional_loglikelihood_fast_impl(counts_v, mu_v, log_thetas[point_idx], model_matrix,
@@ -219,7 +214,7 @@ NumericVector estimate_global_overdispersions_fast(RObject Y, RObject mean_matri
 }
 
 // [[Rcpp::export]]
-NumericVector estimate_global_overdispersions_fast_delayed(RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
+NumericVector estimate_global_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
                                                            const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const bool do_cox_reid_adjustment,
                                                            const NumericVector log_thetas, const int do_parallel = 0) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
@@ -275,8 +270,9 @@ NumericVector estimate_global_overdispersions_fast_delayed(RObject Y, const Eige
 }
 
 // [[Rcpp::export]]
-List estimate_overdispersions_lbfgs_fast(const RObject Y, const RObject mean_matrix, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
-                                         const bool do_cox_reid_adjustment, const int n_subsamples, const int max_iter, const int do_parallel) {
+List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
+                                      const bool do_cox_reid_adjustment, const int n_subsamples, const int max_iter, const double tolerance = 1e-8,
+                                      const int do_parallel = 0) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
   Rtatami::BoundNumericPointer mean_mat_bm_ptr(mean_matrix);
@@ -342,11 +338,11 @@ List estimate_overdispersions_lbfgs_fast(const RObject Y, const RObject mean_mat
         const VectorXd counts_s = counts_v(idx_s);
         const VectorXd mu_s = mu_v(idx_s);
         const MatrixXd mm_s = model_matrix(idx_s, Eigen::all);
-        lbfgs_overdispersion_mle_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_s, mu_s, mm_s, do_cox_reid_adjustment,
-                                      max_iter);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_s, mu_s, mm_s, do_cox_reid_adjustment,
+                                   max_iter, tolerance);
       } else {
-        lbfgs_overdispersion_mle_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_v, mu_v, model_matrix,
-                                      do_cox_reid_adjustment, max_iter);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_v, mu_v, model_matrix,
+                                   do_cox_reid_adjustment, max_iter, tolerance);
       }
     }
   };
@@ -364,9 +360,9 @@ List estimate_overdispersions_lbfgs_fast(const RObject Y, const RObject mean_mat
 }
 
 // [[Rcpp::export]]
-List estimate_overdispersions_lbfgs_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
-                                                 const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const bool do_cox_reid_adjustment,
-                                                 const int n_subsamples, const int max_iter, const int do_parallel = 0) {
+List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
+                                              const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const bool do_cox_reid_adjustment,
+                                              const int n_subsamples, const int max_iter, const double tolerance = 1e-10, const int do_parallel = 0) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
 
@@ -381,7 +377,7 @@ List estimate_overdispersions_lbfgs_fast_delayed(const RObject Y, const Eigen::M
   std::vector<std::string> messages(n_genes);
 
   const bool do_sub = n_subsamples < n_samples;
-  
+
   const auto run = [&](const int start, const int length, const bool check) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     std::unique_ptr<tatami::OracularDenseExtractor<double, int>> offsets_ext;
@@ -434,8 +430,8 @@ List estimate_overdispersions_lbfgs_fast_delayed(const RObject Y, const Eigen::M
           messages[gene_idx] = "Mean estimate was NA. Cannot estimate overdispersion";
           continue;
         }
-        lbfgs_overdispersion_mle_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_s, mu, mm_s, do_cox_reid_adjustment,
-                                      max_iter);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_s, mu, mm_s, do_cox_reid_adjustment,
+                                   max_iter, tolerance);
       } else {
         const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off);
         if (n_samples > 0 && std::isnan(mu(0))) {
@@ -444,8 +440,8 @@ List estimate_overdispersions_lbfgs_fast_delayed(const RObject Y, const Eigen::M
           messages[gene_idx] = "Mean estimate was NA. Cannot estimate overdispersion";
           continue;
         }
-        lbfgs_overdispersion_mle_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_v, mu, model_matrix,
-                                      do_cox_reid_adjustment, max_iter);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_v, mu, model_matrix, do_cox_reid_adjustment,
+                                   max_iter, tolerance);
       }
     }
   };

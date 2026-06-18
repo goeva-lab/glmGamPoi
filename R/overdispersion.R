@@ -75,7 +75,7 @@
 #' @seealso [glm_gp()]
 #' @export
 #' @importFrom beachmat initializeCpp
-overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustment = !is.null(model_matrix), global_estimate = FALSE, subsample = FALSE, max_iter = 200, verbose = FALSE, use_lbfgs_impl = FALSE, do_parallel = 0) {
+overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustment = !is.null(model_matrix), global_estimate = FALSE, subsample = FALSE, max_iter = 200, verbose = FALSE, use_nr_overdisp_impl = FALSE, do_parallel = 0) {
   # Validate n_subsampling
   stopifnot(length(subsample) == 1, subsample >= 0)
   if (isFALSE(subsample)) {
@@ -104,14 +104,14 @@ overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustm
     } else {
       # This function calls overdispersion_mle() for each row, but is faster than a vapply()
       if (is.list(mean)) {
-        (if (use_lbfgs_impl) {
-          function(...) estimate_overdispersions_lbfgs_fast_delayed(..., do_parallel = do_parallel)
+        (if (use_nr_overdisp_impl) {
+          function(...) estimate_overdispersions_nr_fast_delayed(..., do_parallel = do_parallel)
         } else {
           estimate_overdispersions_fast_delayed
         })(initializeCpp(y), model_matrix, initializeCpp(mean[["offset_matrix"]]), mean[["beta_mat"]], do_cox_reid_adjustment, n_subsamples, max_iter)
       } else {
-        (if (use_lbfgs_impl) {
-          function(...) estimate_overdispersions_lbfgs_fast(..., do_parallel = do_parallel)
+        (if (use_nr_overdisp_impl) {
+          function(...) estimate_overdispersions_nr_fast(..., do_parallel = do_parallel)
         } else {
           estimate_overdispersions_fast
         })(initializeCpp(y), initializeCpp(mean), model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter)
@@ -162,7 +162,7 @@ overdispersion_mle_impl <- function(y, mean, model_matrix, do_cox_reid_adjustmen
 }
 
 
-conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 200, verbose = FALSE) {
+conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 1000, verbose = FALSE) {
   return_value <- list(estimate = NA_real_, iterations = NA_real_, message = "")
 
   tab <- make_table_if_small(y, stop_if_larger = length(y) / 2)
@@ -205,13 +205,14 @@ conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matri
     },
     lower = log(1e-16),
     upper = log(1e16),
-    control = list(iter.max = max_iter)
+    control = list(iter.max = max_iter, rel.tol = 1e-10)
   )
 
   if (res$convergence != 0) {
     # Do the same thing again with numerical hessian as the
     # analytical hessian is sometimes less robust than the other
     # two functions
+    return_value$message <- "Used numerical approximation of hessian. "
     res <- nlminb(
       start = log(start_value),
       objective = function(log_theta) {
@@ -226,6 +227,7 @@ conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matri
     )
 
     if (res$convergence != 0) {
+      return_value$message <- "Used numerical approximation of hessian w/o cox-reid adjustment. "
       # Still problematic result: do the same thing without Cox-Reid adjustment
       res <- nlminb(
         start = log(start_value),
@@ -244,7 +246,7 @@ conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matri
 
   return_value$estimate <- exp(res$par)
   return_value$iterations <- res$iterations
-  return_value$message <- res$message
+  return_value$message <- paste0(return_value$message, res$message)
   return_value
 }
 

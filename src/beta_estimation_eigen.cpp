@@ -1,13 +1,12 @@
 #include <fit_beta_eigen.h>
-#include <ostream>
 #include <tatami_helpers.h>
 
-#include "Eigen/src/Core/products/Parallelizer.h"
+#include <utility> // for std::as_const
+
 #include "Rtatami.h"
 
 // [[Rcpp::depends(RcppEigen)]]
 #include <RcppEigen.h>
-#include <utility>
 using namespace Rcpp;
 using Eigen::Map;
 using Eigen::VectorXi;

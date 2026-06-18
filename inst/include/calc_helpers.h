@@ -1,8 +1,13 @@
 #ifndef CALC_HELPERS_H
 #define CALC_HELPERS_H
 
+#include <cfloat>
+#include <cmath>
+const double SQRT_DBL_EPS = std::sqrt(DBL_EPSILON);
+
 #include <Eigen/Dense>
 template <class D> using EMB = Eigen::MatrixBase<D>;
+
 
 template <class D4, class D1, class D2, class D3>
 inline D4 calculate_mu_mult(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat, const EMB<D3> &exp_off) {

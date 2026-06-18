@@ -233,7 +233,7 @@ handle_perf_optim_parameter <- function(param) {
     "cast_dgC_Y_to_dgR" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
     "do_parallel" = list(0L, function(e) (is.integer(e) && (length(e) == 1)), "integer of length 1"),
     "delay_mu" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
-    "use_lbfgs_impl" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
+    "use_nr_overdisp_impl" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
   )
 
   out <- if(is.logical(param) && (length(param) == 1)){
@@ -243,7 +243,7 @@ handle_perf_optim_parameter <- function(param) {
       "cast_dgC_Y_to_dgR" = param,
       "do_parallel" = as.integer(param),
       "delay_mu" = param,
-      "use_lbfgs_impl" = param
+      "use_nr_overdisp_impl" = param
     )
   }else if(is.list(param) && (length(union(names(default_opts), names(param)))) == length(default_opts)){
     for(nm in names(param)){

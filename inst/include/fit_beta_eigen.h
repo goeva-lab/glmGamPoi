@@ -6,8 +6,7 @@
 #include <fisher_scoring_steps_eigen.h>
 #include <opt_max.h>
 
-#include <cfloat>
-#include <cmath>
+#include <utility> // for std::as_const
 
 #include <Eigen/Dense>
 #include <utility>
@@ -109,7 +108,6 @@ public:
   }
 };
 
-const double SQRT_DBL_EPS = std::sqrt(DBL_EPSILON);
 template <class D1, class D2, class D3, class Fn1>
 inline void fitBeta_FS_optim_step(
     // in-out params
@@ -127,10 +125,8 @@ inline void fitBeta_FS_optim_step(
   params.epsilon_rel = 0;
   params.past = 1;
   params.delta = 1e-12;
-  params.max_linesearch = 1024;
-  params.linesearch = LBFGSpp::LBFGS_LINESEARCH_BACKTRACKING_ARMIJO;
   // NocedalWright linesearch fails to find value, using MoreThuente instead
-  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchBracketing> solver(params);
+  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
 
   // default used by the Eigen::NumericalDiff module 
   const auto eps = SQRT_DBL_EPS;
@@ -252,7 +248,7 @@ inline void fitBeta_NR_internal_step(
 
     const double step = dl / ddl;
     beta += step;
-    if ((std::abs(step) < tolerance) || (std::isnan(beta))) {
+    if ((std::fabs(step) < tolerance) || (std::isnan(beta))) {
       break;
     }
   }
