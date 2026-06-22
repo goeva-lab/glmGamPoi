@@ -119,15 +119,15 @@ overdispersion_mle <- function(y, mean, model_matrix = NULL, do_cox_reid_adjustm
     }
   } else {
     if (!missing(mean) && is.list(mean)) {
-      overdispersion_mle_impl(as.numeric(y), mean[["fn"]](), model_matrix, do_cox_reid_adjustment, min(n_subsamples, length(y)), max_iter, verbose = verbose)
+      overdispersion_mle_impl(as.numeric(y), mean[["fn"]](), model_matrix, do_cox_reid_adjustment, min(n_subsamples, length(y)), max_iter, verbose = verbose, use_nr_overdisp_impl = use_nr_overdisp_impl)
     } else {
-      overdispersion_mle_impl(as.numeric(y), mean, model_matrix, do_cox_reid_adjustment, min(n_subsamples, length(y)), max_iter, verbose = verbose)
+      overdispersion_mle_impl(as.numeric(y), mean, model_matrix, do_cox_reid_adjustment, min(n_subsamples, length(y)), max_iter, verbose = verbose, use_nr_overdisp_impl = use_nr_overdisp_impl)
     }
   }
 }
 
 
-overdispersion_mle_impl <- function(y, mean, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, verbose = FALSE) {
+overdispersion_mle_impl <- function(y, mean, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, verbose = FALSE, use_nr_overdisp_impl = FALSE) {
   stopifnot(is.numeric(y))
   if (missing(mean)) {
     mean <- base::mean(y)
@@ -157,8 +157,12 @@ overdispersion_mle_impl <- function(y, mean, model_matrix, do_cox_reid_adjustmen
   stopifnot(all(is.finite(y)))
   stopifnot(all(is.finite(mean)))
 
-  # Do conventional optimization
-  conventional_overdispersion_mle(y, mean_vector = mean, model_matrix = model_matrix, do_cox_reid_adjustment = do_cox_reid_adjustment, max_iter = max_iter, verbose = verbose)
+  (if (use_nr_overdisp_impl) {
+    NR_overdispersion_mle
+  } else {
+    # Do conventional optimization
+    conventional_overdispersion_mle
+  })(y, mean_vector = mean, model_matrix = model_matrix, do_cox_reid_adjustment = do_cox_reid_adjustment, max_iter = max_iter, verbose = verbose)
 }
 
 
@@ -205,7 +209,7 @@ conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matri
     },
     lower = log(1e-16),
     upper = log(1e16),
-    control = list(iter.max = max_iter, rel.tol = 1e-10)
+    control = list(iter.max = max_iter)
   )
 
   if (res$convergence != 0) {

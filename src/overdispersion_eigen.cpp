@@ -1,5 +1,6 @@
 #include <calc_helpers.h>
 #include <overdispersion_eigen.h>
+#include <par_helpers.h>
 #include <tatami_helpers.h>
 
 #include <algorithm> // for std::shuffle
@@ -53,6 +54,18 @@ double conventional_deriv_score_function_fast(const NumericVector y, const Eigen
       count_frequencies_v(count_frequencies.begin(), count_frequencies.size()), y_v(y.begin(), y.size());
   return conventional_deriv_score_function_fast_impl(y_v, mu, log_theta, model_matrix, do_cr_adj, unique_counts_v, count_frequencies_v);
 }
+// [[Rcpp::export]]
+List NR_overdispersion_mle(const NumericVector y, const Eigen::Map<Eigen::VectorXd> &mean_vector, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
+                           const bool do_cox_reid_adjustment, const int max_iter = 1000, const double tolerance = 1e-8) {
+  const Map<const VectorXd> y_v(y.begin(), y.size());
+
+  double est = NAN;
+  int iters = -1;
+  std::string msg = "";
+  overdispersion_mle_NR_impl(est, iters, msg, y_v, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance);
+
+  return List::create(_["estimate"] = est, _["iterations"] = iters, _["message"] = msg);
+}
 
 // [[Rcpp::export]]
 List estimate_overdispersions_fast(const RObject Y, const RObject mean_matrix, const NumericMatrix model_matrix, const bool do_cox_reid_adjustment,
@@ -78,7 +91,8 @@ List estimate_overdispersions_fast(const RObject Y, const RObject mean_matrix, c
   NumericVector counts(n_samples), mu(n_samples);
 
   // This is calling back to R, which simplifies my code a lot
-  const Function overdispersion_mle_impl("overdispersion_mle_impl");
+  Environment glmGamPoiEnv = Environment::namespace_env("glmGamPoi2");
+  Function overdispersion_mle_impl = glmGamPoiEnv["overdispersion_mle_impl"];
   for (int gene_idx = 0; gene_idx < n_genes; gene_idx++) {
     if (gene_idx % 100 == 0)
       checkUserInterrupt();
@@ -132,7 +146,8 @@ List estimate_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eig
   VectorXd off(n_samples);
 
   // This is calling back to R, which simplifies my code a lot
-  const Function overdispersion_mle_impl("overdispersion_mle_impl");
+  Environment glmGamPoiEnv = Environment::namespace_env("glmGamPoi2");
+  Function overdispersion_mle_impl = glmGamPoiEnv["overdispersion_mle_impl"];
   for (int gene_idx = 0; gene_idx < n_genes; gene_idx++) {
     if (gene_idx % 100 == 0)
       Rcpp::checkUserInterrupt();
@@ -175,15 +190,17 @@ NumericVector estimate_global_overdispersions_fast(const RObject Y, const RObjec
 
   NumericVector log_likelihoods(n_spline_points);
 
-  const auto run = [&](const int start, const int length, const bool check) -> void {
+  const auto run = [&](const int start, const int length) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(&Y_bm, true, start, length);
     auto mean_mat_ext = tatami::consecutive_extractor<false>(&mean_mat_bm, true, start, length);
     VectorXd counts(n_samples), mu(n_samples);
 
     const auto grp_max_id = start + length;
     for (int gene_idx = start; gene_idx < grp_max_id; gene_idx++) {
-      if (check && gene_idx % 100 == 0) {
-        Rcpp::checkUserInterrupt();
+      if (gene_idx % 100 == 0) {
+        if (check_interrupt()) {
+          return;
+        }
       }
 
       const auto cptr = Y_ext->fetch(counts.data());
@@ -201,22 +218,25 @@ NumericVector estimate_global_overdispersions_fast(const RObject Y, const RObjec
     }
   };
 
-  if (do_parallel) {
-    const auto nt = Eigen::nbThreads();
-    Eigen::setNbThreads(1);
-    tatami::parallelize([&](int thread, int start, int length) -> void { run(start, length, false); }, n_genes, do_parallel);
-    Eigen::setNbThreads(nt);
+  if (do_parallel > 0) {
+    run_par(run, n_genes, do_parallel);
   } else {
-    run(0, n_genes, true);
+    run(0, n_genes);
+  }
+  // check if we got an interrupt, if yes, re-raise it
+  if (check_interrupt()) {
+    std::raise(SIGINT);
+    Rcpp::checkUserInterrupt();
   }
 
   return log_likelihoods;
 }
 
 // [[Rcpp::export]]
-NumericVector estimate_global_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
-                                                           const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const bool do_cox_reid_adjustment,
-                                                           const NumericVector log_thetas, const int do_parallel = 0) {
+NumericVector estimate_global_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
+                                                           const RObject offset_matrix, const Eigen::Map<Eigen::MatrixXd> &beta_mat_v,
+                                                           const bool do_cox_reid_adjustment, const NumericVector log_thetas,
+                                                           const int do_parallel = 0) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
   Rtatami::BoundNumericPointer offsets_bm_ptr(offset_matrix);
@@ -228,15 +248,17 @@ NumericVector estimate_global_overdispersions_fast_delayed(const RObject Y, cons
 
   NumericVector log_likelihoods(n_spline_points);
 
-  const auto run = [&](const int start, const int length, const bool check) -> void {
+  const auto run = [&](const int start, const int length) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(&Y_bm, true, start, length);
     auto offsets_ext = tatami::consecutive_extractor<false>(&offsets_bm, true, start, length);
     VectorXd counts(n_samples), off(n_samples);
 
     const auto grp_max_id = start + length;
     for (int gene_idx = start; gene_idx < grp_max_id; gene_idx++) {
-      if (check && gene_idx % 100 == 0) {
-        Rcpp::checkUserInterrupt();
+      if (gene_idx % 100 == 0) {
+        if (check_interrupt()) {
+          return;
+        }
       }
 
       const auto cptr = Y_ext->fetch(counts.data());
@@ -257,13 +279,15 @@ NumericVector estimate_global_overdispersions_fast_delayed(const RObject Y, cons
       }
     }
   };
-  if (do_parallel) {
-    const auto nt = Eigen::nbThreads();
-    Eigen::setNbThreads(1);
-    tatami::parallelize([&](int thread, int start, int length) -> void { run(start, length, false); }, n_genes, do_parallel);
-    Eigen::setNbThreads(nt);
+  if (do_parallel > 0) {
+    run_par(run, n_genes, do_parallel);
   } else {
-    run(0, n_genes, true);
+    run(0, n_genes);
+  }
+  // check if we got an interrupt, if yes, re-raise it
+  if (check_interrupt()) {
+    std::raise(SIGINT);
+    Rcpp::checkUserInterrupt();
   }
 
   return log_likelihoods;
@@ -291,7 +315,7 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
 
   const bool do_sub = n_subsamples < n_samples;
 
-  const auto run = [&](const int start, const int length, const bool check) -> void {
+  const auto run = [&](const int start, const int length) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     auto mean_mat_ext = tatami::consecutive_extractor<false>(mean_mat_bm, true, start, length);
     VectorXd counts(n_samples), mu(n_samples);
@@ -312,8 +336,10 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
 
     const auto grp_max_id = start + length;
     for (int gene_idx = start; gene_idx < grp_max_id; gene_idx++) {
-      if (check && gene_idx % 100 == 0) {
-        Rcpp::checkUserInterrupt();
+      if (gene_idx % 100 == 0) {
+        if (check_interrupt()) {
+          return;
+        }
       }
 
       // Using copy_n to ensure that the vectors are actually filled.
@@ -347,13 +373,15 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
     }
   };
 
-  if (do_parallel) {
-    const auto nt = Eigen::nbThreads();
-    Eigen::setNbThreads(1);
-    tatami::parallelize([&](int thread, int start, int length) -> void { run(start, length, false); }, n_genes, do_parallel);
-    Eigen::setNbThreads(nt);
+  if (do_parallel > 0) {
+    run_par(run, n_genes, do_parallel);
   } else {
-    run(0, n_genes, true);
+    run(0, n_genes);
+  }
+  // check if we got an interrupt, if yes, re-raise it
+  if (check_interrupt()) {
+    std::raise(SIGINT);
+    Rcpp::checkUserInterrupt();
   }
 
   return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);
@@ -362,7 +390,7 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
 // [[Rcpp::export]]
 List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
                                               const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const bool do_cox_reid_adjustment,
-                                              const int n_subsamples, const int max_iter, const double tolerance = 1e-10, const int do_parallel = 0) {
+                                              const int n_subsamples, const int max_iter, const double tolerance = 1e-8, const int do_parallel = 0) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
 
@@ -378,7 +406,7 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
 
   const bool do_sub = n_subsamples < n_samples;
 
-  const auto run = [&](const int start, const int length, const bool check) -> void {
+  const auto run = [&](const int start, const int length) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     std::unique_ptr<tatami::OracularDenseExtractor<double, int>> offsets_ext;
     if (offsets_bm.nrow() > 1) {
@@ -404,8 +432,10 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
 
     const auto grp_max_id = start + length;
     for (int gene_idx = start; gene_idx < grp_max_id; gene_idx++) {
-      if (check && gene_idx % 100 == 0) {
-        Rcpp::checkUserInterrupt();
+      if (gene_idx % 100 == 0) {
+        if (check_interrupt()) {
+          return;
+        }
       }
 
       // Using copy_n to ensure that the vectors are actually filled.
@@ -446,13 +476,15 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
     }
   };
 
-  if (do_parallel) {
-    const auto nt = Eigen::nbThreads();
-    Eigen::setNbThreads(1);
-    tatami::parallelize([&](int thread, int start, int length) -> void { run(start, length, false); }, n_genes, do_parallel);
-    Eigen::setNbThreads(nt);
+  if (do_parallel > 0) {
+    run_par(run, n_genes, do_parallel);
   } else {
-    run(0, n_genes, true);
+    run(0, n_genes);
+  }
+  // check if we got an interrupt, if yes, re-raise it
+  if (check_interrupt()) {
+    std::raise(SIGINT);
+    Rcpp::checkUserInterrupt();
   }
 
   return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);

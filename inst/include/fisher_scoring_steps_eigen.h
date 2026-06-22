@@ -52,7 +52,7 @@ inline VectorXd fisher_scoring_qr_step(const EMB<D1> &model_matrix, const EMB<D2
 
 template <class D1, class D2, class D3, class D4, class D5, class D6, class D7>
 inline VectorXd fisher_scoring_qr_ridge_step(const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &mu, const EMB<D4> &theta_times_mu,
-                                             const EMB<D5> &ridge_penalty, const EMB<D6> &ridge_target, const EMB<D7> &beta) {
+                                             const EMB<D5> &ridge_penalty, const EMB<D6> &ridge_target, const EMB<D7> &beta_hat) {
   const int extra = ridge_penalty.rows();
 
   // the sqrt(n) is important to scale the ridge_penalty by the number of samples
@@ -65,7 +65,7 @@ inline VectorXd fisher_scoring_qr_ridge_step(const EMB<D1> &model_matrix, const 
   ArrayXd extended_w_sqrt_vec(mu.size() + extra);
   extended_w_sqrt_vec << (mu.array() / (1.0 + theta_times_mu.array())).sqrt(), VectorXd::Constant(extra, 1.0);
   VectorXd extended_working_resid(counts.size() + extra);
-  extended_working_resid << (counts - mu).cwiseQuotient(mu), ridge_helper * (ridge_target - beta);
+  extended_working_resid << (counts - mu).cwiseQuotient(mu), ridge_helper * (ridge_target - beta_hat);
 
   // The QR decomposition of the model_matrix
   const HouseholderQR qr = (extended_model_matrix.array().colwise() * extended_w_sqrt_vec).matrix().householderQr();

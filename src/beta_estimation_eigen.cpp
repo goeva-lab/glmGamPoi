@@ -1,7 +1,6 @@
 #include <fit_beta_eigen.h>
+#include <par_helpers.h>
 #include <tatami_helpers.h>
-
-#include <utility> // for std::as_const
 
 #include "Rtatami.h"
 
@@ -21,8 +20,8 @@ Eigen::MatrixXd fisher_scoring_qr_step_mask(const Eigen::Map<Eigen::MatrixXd> &m
 Eigen::MatrixXd fisher_scoring_qr_ridge_step_mask(const Eigen::Map<Eigen::MatrixXd> &model_matrix, const Eigen::Map<Eigen::VectorXd> &counts,
                                                   const Eigen::Map<Eigen::VectorXd> &mu, const Eigen::Map<Eigen::VectorXd> &theta_times_mu,
                                                   const Eigen::Map<Eigen::MatrixXd> &ridge_penalty, const Eigen::Map<Eigen::VectorXd> &ridge_target,
-                                                  const Eigen::Map<Eigen::VectorXd> &beta) {
-  return fisher_scoring_qr_ridge_step(model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta);
+                                                  const Eigen::Map<Eigen::VectorXd> &beta_hat) {
+  return fisher_scoring_qr_ridge_step(model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta_hat);
 }
 
 // [[Rcpp::export(name = "fisher_scoring_diagonal_step")]]
@@ -99,13 +98,14 @@ IntegerVector get_row_groups(const NumericMatrix &matrix, const int n_groups, co
 // fit the Negative Binomial GLM with Fisher scoring
 // note: the betas are on the natural log scale
 //
-template <class Fn1, class Fn2>
+template <class FSConf>
 List fitBeta_fisher_scoring_impl(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject exp_offset_matrix,
                                  const NumericVector thetas, const Eigen::Map<Eigen::MatrixXd> &beta_mat_v,
                                  // callbacks
-                                 const Fn1 &cgp_sum, const Fn2 &fisher_step,
+                                 const FSConf &conf,
                                  // misc other parameters
-                                 const double tolerance, const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim, const int do_parallel) {
+                                 const double tolerance, const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim,
+                                 const int do_parallel) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
 
@@ -125,7 +125,7 @@ List fitBeta_fisher_scoring_impl(const RObject Y, const Eigen::Map<Eigen::Matrix
   Map<VectorXi> iterations_v(iterations.begin(), iterations.size());
   Map<VectorXd> deviance_v(deviance.begin(), deviance.size());
 
-  const auto run = [&](const int start, const int length, const bool check) -> void {
+  const auto run = [&](const int start, const int length) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     std::unique_ptr<tatami::OracularDenseExtractor<double, int>> exp_offsets_ext;
     if (exp_offsets_bm.nrow() > 1) {
@@ -138,8 +138,10 @@ List fitBeta_fisher_scoring_impl(const RObject Y, const Eigen::Map<Eigen::Matrix
 
     const auto grp_max_id = start + length;
     for (int gene_idx = start; gene_idx < grp_max_id; gene_idx++) {
-      if (check && gene_idx % 100 == 0) {
-        Rcpp::checkUserInterrupt();
+      if (gene_idx % 100 == 0) {
+        if (check_interrupt()) {
+          return;
+        }
       }
 
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
@@ -149,18 +151,20 @@ List fitBeta_fisher_scoring_impl(const RObject Y, const Eigen::Map<Eigen::Matrix
 
       auto beta_row = beta_mat.row(gene_idx); // using auto on purpose to get a block expression
 
-      fitBeta_FS_internal_step(beta_row, deviance_v(gene_idx), iterations_v(gene_idx), model_matrix, counts_v, exp_off_v, cgp_sum, fisher_step,
-                               thetas(gene_idx), tolerance, max_rel_mu_change, max_iter, try_recov_w_optim);
+      fitBeta_FS_internal_step(beta_row, deviance_v(gene_idx), iterations_v(gene_idx), model_matrix, counts_v, exp_off_v, conf, thetas(gene_idx),
+                               tolerance, max_rel_mu_change, max_iter, try_recov_w_optim);
     }
   };
 
-  if (do_parallel) {
-    const auto nt = Eigen::nbThreads();
-    Eigen::setNbThreads(1);
-    tatami::parallelize([&](int thread, int start, int length) -> void { run(start, length, false); }, n_genes, do_parallel);
-    Eigen::setNbThreads(nt);
+  if (do_parallel > 0) {
+    run_par(run, n_genes, do_parallel);
   } else {
-    run(0, n_genes, true);
+    run(0, n_genes);
+  }
+  // check if we got an interrupt, if yes, re-raise it
+  if (check_interrupt()) {
+    std::raise(SIGINT);
+    Rcpp::checkUserInterrupt();
   }
 
   return List::create(_["beta_mat"] = beta_mat, _["iter"] = iterations, _["deviance"] = deviance);
@@ -169,7 +173,8 @@ List fitBeta_fisher_scoring_impl(const RObject Y, const Eigen::Map<Eigen::Matrix
 // [[Rcpp::export]]
 List fitBeta_fisher_scoring(const RObject Y, const Eigen::Map<Eigen::MatrixXd> model_matrix, const RObject exp_offset_matrix,
                             const NumericVector thetas, const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const Nullable<NumericMatrix> ridge_penalty_nl,
-                            const double tolerance, const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim = false, const int do_parallel = 0) {
+                            const double tolerance, const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim = false,
+                            const int do_parallel = 0) {
   if (ridge_penalty_nl.isNotNull()) {
     const NumericMatrix tmp = ridge_penalty_nl.get();
     const auto ridge_penalty = Rcpp::as<Map<MatrixXd>>(tmp);
@@ -177,69 +182,42 @@ List fitBeta_fisher_scoring(const RObject Y, const Eigen::Map<Eigen::MatrixXd> m
     if (model_matrix.cols() != nc) {
       stop("Number of columns in model_matrix does not match the columns of the ridge_penalty");
     }
-    const MatrixXd ridge_penalty_sq = ridge_penalty.transpose() * ridge_penalty;
     const auto n_samples = (double)model_matrix.rows();
 
     if (tmp.hasAttribute("target")) {
       const NumericVector ridge_target_buf = tmp.attr("target");
       const Map<const VectorXd> ridge_target(ridge_target_buf.begin(), ridge_target_buf.size());
 
-      const auto cgp_sum = [&rps = std::as_const(ridge_penalty_sq), &rt = std::as_const(ridge_target), &nr = std::as_const(n_samples)](
-                               const auto &counts, const auto &mu_hat, const auto &theta, const auto &beta_hat) -> double {
-        return compute_gp_deviance_sum(counts, mu_hat, theta) + compute_pen_sum(beta_hat - rt, rps, nr);
-      };
-      const auto fisher_step = [&rp = std::as_const(ridge_penalty), &rt = std::as_const(ridge_target)](const auto &model_matrix, const auto &counts,
-                                                                                                       const auto &mu, const auto &theta_times_mu,
-                                                                                                       const auto &beta_hat) -> VectorXd {
-        return fisher_scoring_qr_ridge_step(model_matrix, counts, mu, theta_times_mu, rp, rt, beta_hat);
-      };
-
-      return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, cgp_sum, fisher_step, tolerance, max_rel_mu_change,
-                                         max_iter, try_recov_w_optim, do_parallel);
+      const FisherScoreQRwRidge conf(ridge_target, ridge_penalty, n_samples);
+      return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, tolerance, max_rel_mu_change, max_iter,
+                                         try_recov_w_optim, do_parallel);
     } else {
       const VectorXd ridge_target = VectorXd::Constant(nc, 0.0);
 
-      const auto cgp_sum = [&rps = std::as_const(ridge_penalty_sq), &rt = std::as_const(ridge_target), &nr = std::as_const(n_samples)](
-                               const auto &counts, const auto &mu_hat, const auto &theta, const auto &beta_hat) -> double {
-        return compute_gp_deviance_sum(counts, mu_hat, theta) + compute_pen_sum(beta_hat - rt, rps, nr);
-      };
-      const auto fisher_step = [&rp = std::as_const(ridge_penalty), &rt = std::as_const(ridge_target)](const auto &model_matrix, const auto &counts,
-                                                                                                       const auto &mu, const auto &theta_times_mu,
-                                                                                                       const auto &beta_hat) -> VectorXd {
-        return fisher_scoring_qr_ridge_step(model_matrix, counts, mu, theta_times_mu, rp, rt, beta_hat);
-      };
-
-      return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, cgp_sum, fisher_step, tolerance, max_rel_mu_change,
-                                         max_iter, try_recov_w_optim, do_parallel);
+      const FisherScoreQRwRidge conf(ridge_target, ridge_penalty, n_samples);
+      return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, tolerance, max_rel_mu_change, max_iter,
+                                         try_recov_w_optim, do_parallel);
     }
   }
-  const auto cgp_sum = [](const auto &counts, const auto &mu_hat, const auto &theta, const auto &beta_hat) -> double {
-    return compute_gp_deviance_sum(counts, mu_hat, theta);
-  };
-  const auto fisher_step = [](const auto &model_matrix, const auto &counts, const auto &mu, const auto &theta_times_mu,
-                              const auto &beta_hat) -> VectorXd { return fisher_scoring_qr_step(model_matrix, counts, mu, theta_times_mu); };
 
-  return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, cgp_sum, fisher_step, tolerance, max_rel_mu_change,
-                                     max_iter, try_recov_w_optim, do_parallel);
+  const auto conf = FisherScoreQR();
+  return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, tolerance, max_rel_mu_change, max_iter,
+                                     try_recov_w_optim, do_parallel);
 }
 
 // [[Rcpp::export]]
 List fitBeta_diagonal_fisher_scoring(const RObject Y, const Eigen::Map<Eigen::MatrixXd> model_matrix, const RObject exp_offset_matrix,
                                      const NumericVector thetas, const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const double tolerance,
-                                     const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim = false, const int do_parallel = 0) {
-  const auto cgp_sum = [](const auto &counts, const auto &mu_hat, const auto &theta, const auto &beta_hat) -> double {
-    return compute_gp_deviance_sum(counts, mu_hat, theta);
-  };
-  const auto fisher_step = [](const auto &model_matrix, const auto &counts, const auto &mu, const auto &theta_times_mu,
-                              const auto &beta_hat) -> VectorXd { return fisher_scoring_diagonal_step(model_matrix, counts, mu, theta_times_mu); };
-
-  return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, cgp_sum, fisher_step, tolerance, max_rel_mu_change,
+                                     const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim = false,
+                                     const int do_parallel = 0) {
+  const auto conf = FisherScoreDiagApprox();
+  return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, tolerance, max_rel_mu_change,
                                      max_iter, try_recov_w_optim, do_parallel);
 }
 
-template <class Fn1>
+template <class FSConf>
 List fitBeta_optim_impl(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject exp_offset_matrix, const NumericVector thetas,
-                        const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const Fn1 &cgp_sum, const int max_iter, const int do_parallel) {
+                        const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const FSConf &conf, const int max_iter, const int do_parallel) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
   const auto &Y_bm = *(Y_bm_ptr->ptr);
 
@@ -257,7 +235,7 @@ List fitBeta_optim_impl(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &mode
   Map<VectorXi> iterations_v(iterations.begin(), iterations.size());
   Map<VectorXd> deviance_v(deviance.begin(), deviance.size());
 
-  const auto run = [&](const int start, const int length, const bool check) -> void {
+  const auto run = [&](const int start, const int length) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     std::unique_ptr<tatami::OracularDenseExtractor<double, int>> exp_offsets_ext;
     if (exp_offsets_bm.nrow() > 1) {
@@ -270,8 +248,10 @@ List fitBeta_optim_impl(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &mode
 
     const auto grp_max_id = start + length;
     for (int gene_idx = start; gene_idx < grp_max_id; gene_idx++) {
-      if (check && gene_idx % 100 == 0) {
-        Rcpp::checkUserInterrupt();
+      if (gene_idx % 100 == 0) {
+        if (check_interrupt()) {
+          return;
+        }
       }
 
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
@@ -280,20 +260,21 @@ List fitBeta_optim_impl(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &mode
       const Map<const VectorXd> counts_v(cptr, n_samples), exp_off_v(eptr, n_samples);
 
       VectorXd beta_row = beta_mat.row(gene_idx);
-      fitBeta_FS_optim_step(beta_row, deviance_v(gene_idx), iterations_v(gene_idx), model_matrix, counts_v, exp_off_v, cgp_sum, thetas(gene_idx),
+      fitBeta_FS_optim_step(beta_row, deviance_v(gene_idx), iterations_v(gene_idx), model_matrix, counts_v, exp_off_v, conf, thetas(gene_idx),
                             max_iter);
       beta_mat.row(gene_idx) = beta_row;
     }
   };
 
-  if (do_parallel) {
-    const auto nt = Eigen::nbThreads();
-    Eigen::setNbThreads(1);
-    tatami::parallelize([&](int thread, int start, int length) -> void { run(start, length, false); }, n_genes, do_parallel);
-    Eigen::setNbThreads(nt);
+  if (do_parallel > 0) {
+    run_par(run, n_genes, do_parallel);
+  } else {
+    run(0, n_genes);
   }
-  else {
-    run(0, n_genes, true);
+  // check if we got an interrupt, if yes, re-raise it
+  if (check_interrupt()) {
+    std::raise(SIGINT);
+    Rcpp::checkUserInterrupt();
   }
 
   return List::create(_["Beta"] = beta_mat, _["iterations"] = iterations, _["deviances"] = deviance);
@@ -301,7 +282,8 @@ List fitBeta_optim_impl(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &mode
 
 //[[Rcpp::export(rng = false)]]
 List fitBeta_optim(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject exp_offset_matrix, const NumericVector thetas,
-                   const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const Nullable<NumericMatrix> ridge_penalty_nl, const int max_iter, const int do_parallel = 0) {
+                   const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const Nullable<NumericMatrix> ridge_penalty_nl, const int max_iter,
+                   const int do_parallel = 0) {
   if (ridge_penalty_nl.isNotNull()) {
     const NumericMatrix tmp = ridge_penalty_nl.get();
     const auto ridge_penalty = Rcpp::as<Map<MatrixXd>>(tmp);
@@ -309,35 +291,24 @@ List fitBeta_optim(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_mat
     if (model_matrix.cols() != nc) {
       stop("Number of columns in model_matrix does not match the columns of the ridge_penalty");
     }
-    const MatrixXd ridge_penalty_sq = ridge_penalty.transpose() * ridge_penalty;
     const auto n_samples = (double)model_matrix.rows();
 
     if (tmp.hasAttribute("target")) {
       const NumericVector ridge_target_buf = tmp.attr("target");
       const Map<const VectorXd> ridge_target(ridge_target_buf.begin(), ridge_target_buf.size());
 
-      const auto cgp_sum = [&rps = std::as_const(ridge_penalty_sq), &rt = std::as_const(ridge_target),
-                            &nr = n_samples](const auto &counts, const auto &mu_hat, const auto &theta, const auto &beta_hat) -> double {
-        return compute_gp_deviance_sum(counts, mu_hat, theta) + compute_pen_sum(beta_hat - rt, rps, nr);
-      };
-
-      return fitBeta_optim_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, cgp_sum, max_iter, do_parallel);
+      const FisherScoreQRwRidge conf(ridge_target, ridge_penalty, n_samples);
+      return fitBeta_optim_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, max_iter, do_parallel);
     } else {
       const VectorXd ridge_target = VectorXd::Constant(nc, 0.0);
 
-      const auto cgp_sum = [&rps = std::as_const(ridge_penalty_sq), &rt = std::as_const(ridge_target),
-                            &nr = n_samples](const auto &counts, const auto &mu_hat, const auto &theta, const auto &beta_hat) -> double {
-        return compute_gp_deviance_sum(counts, mu_hat, theta) + compute_pen_sum(beta_hat - rt, rps, nr);
-      };
-
-      return fitBeta_optim_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, cgp_sum, max_iter, do_parallel);
+      const FisherScoreQRwRidge conf(ridge_target, ridge_penalty, n_samples);
+      return fitBeta_optim_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, max_iter, do_parallel);
     }
   }
-  const auto cgp_sum = [](const auto &counts, const auto &mu_hat, const auto &theta, const auto &beta_hat) -> double {
-    return compute_gp_deviance_sum(counts, mu_hat, theta);
-  };
 
-  return fitBeta_optim_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, cgp_sum, max_iter, do_parallel);
+  const auto conf = FisherScoreQR();
+  return fitBeta_optim_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, max_iter, do_parallel);
 }
 
 // If there is only one group, there is no need to do the full Fisher-scoring
@@ -362,7 +333,7 @@ List fitBeta_one_group(const RObject Y, const RObject offset_matrix, const Numer
   Map<VectorXd> result_v(result.begin(), result.size()), deviance_v(deviance.begin(), deviance.size());
   Map<VectorXi> iterations_v(iterations.begin(), iterations.size());
 
-  const auto run = [&](const int start, const int length, const bool check) -> void {
+  const auto run = [&](const int start, const int length) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     std::unique_ptr<tatami::OracularDenseExtractor<double, int>> offset_ext;
     if (offsets_bm.nrow() > 1) {
@@ -374,8 +345,10 @@ List fitBeta_one_group(const RObject Y, const RObject offset_matrix, const Numer
 
     const auto grp_max_id = start + length;
     for (int gene_idx = start; gene_idx < grp_max_id; gene_idx++) {
-      if (check && gene_idx % 100 == 0) {
-        Rcpp::checkUserInterrupt();
+      if (gene_idx % 100 == 0) {
+        if (check_interrupt()) {
+          return;
+        }
       }
       const auto cptr = Y_ext->fetch(counts_vec.data());
       const auto optr = offset_ext->fetch(off_vec.data());
@@ -386,13 +359,15 @@ List fitBeta_one_group(const RObject Y, const RObject offset_matrix, const Numer
                                max_iter);
     }
   };
-  if (do_parallel) {
-    const auto nt = Eigen::nbThreads();
-    Eigen::setNbThreads(1);
-    tatami::parallelize([&](int thread, int start, int length) -> void { run(start, length, false); }, n_genes, do_parallel);
-    Eigen::setNbThreads(nt);
+  if (do_parallel > 0) {
+    run_par(run, n_genes, do_parallel);
   } else {
-    run(0, n_genes, true);
+    run(0, n_genes);
+  }
+  // check if we got an interrupt, if yes, re-raise it
+  if (check_interrupt()) {
+    std::raise(SIGINT);
+    Rcpp::checkUserInterrupt();
   }
 
   return List::create(_["beta"] = result, _["iter"] = iterations, _["deviance"] = deviance);

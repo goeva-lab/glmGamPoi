@@ -26,8 +26,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // fisher_scoring_qr_ridge_step_mask
-Eigen::MatrixXd fisher_scoring_qr_ridge_step_mask(const Eigen::Map<Eigen::MatrixXd>& model_matrix, const Eigen::Map<Eigen::VectorXd>& counts, const Eigen::Map<Eigen::VectorXd>& mu, const Eigen::Map<Eigen::VectorXd>& theta_times_mu, const Eigen::Map<Eigen::MatrixXd>& ridge_penalty, const Eigen::Map<Eigen::VectorXd>& ridge_target, const Eigen::Map<Eigen::VectorXd>& beta);
-RcppExport SEXP _glmGamPoi2_fisher_scoring_qr_ridge_step_mask(SEXP model_matrixSEXP, SEXP countsSEXP, SEXP muSEXP, SEXP theta_times_muSEXP, SEXP ridge_penaltySEXP, SEXP ridge_targetSEXP, SEXP betaSEXP) {
+Eigen::MatrixXd fisher_scoring_qr_ridge_step_mask(const Eigen::Map<Eigen::MatrixXd>& model_matrix, const Eigen::Map<Eigen::VectorXd>& counts, const Eigen::Map<Eigen::VectorXd>& mu, const Eigen::Map<Eigen::VectorXd>& theta_times_mu, const Eigen::Map<Eigen::MatrixXd>& ridge_penalty, const Eigen::Map<Eigen::VectorXd>& ridge_target, const Eigen::Map<Eigen::VectorXd>& beta_hat);
+RcppExport SEXP _glmGamPoi2_fisher_scoring_qr_ridge_step_mask(SEXP model_matrixSEXP, SEXP countsSEXP, SEXP muSEXP, SEXP theta_times_muSEXP, SEXP ridge_penaltySEXP, SEXP ridge_targetSEXP, SEXP beta_hatSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -37,8 +37,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type theta_times_mu(theta_times_muSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type ridge_penalty(ridge_penaltySEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type ridge_target(ridge_targetSEXP);
-    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type beta(betaSEXP);
-    rcpp_result_gen = Rcpp::wrap(fisher_scoring_qr_ridge_step_mask(model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta));
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type beta_hat(beta_hatSEXP);
+    rcpp_result_gen = Rcpp::wrap(fisher_scoring_qr_ridge_step_mask(model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta_hat));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -258,6 +258,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// NR_overdispersion_mle
+List NR_overdispersion_mle(const NumericVector y, const Eigen::Map<Eigen::VectorXd>& mean_vector, const Eigen::Map<Eigen::MatrixXd>& model_matrix, const bool do_cox_reid_adjustment, const int max_iter, const double tolerance);
+RcppExport SEXP _glmGamPoi2_NR_overdispersion_mle(SEXP ySEXP, SEXP mean_vectorSEXP, SEXP model_matrixSEXP, SEXP do_cox_reid_adjustmentSEXP, SEXP max_iterSEXP, SEXP toleranceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type mean_vector(mean_vectorSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type model_matrix(model_matrixSEXP);
+    Rcpp::traits::input_parameter< const bool >::type do_cox_reid_adjustment(do_cox_reid_adjustmentSEXP);
+    Rcpp::traits::input_parameter< const int >::type max_iter(max_iterSEXP);
+    Rcpp::traits::input_parameter< const double >::type tolerance(toleranceSEXP);
+    rcpp_result_gen = Rcpp::wrap(NR_overdispersion_mle(y, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance));
+    return rcpp_result_gen;
+END_RCPP
+}
 // estimate_overdispersions_fast
 List estimate_overdispersions_fast(const RObject Y, const RObject mean_matrix, const NumericMatrix model_matrix, const bool do_cox_reid_adjustment, const double n_subsamples, const int max_iter);
 RcppExport SEXP _glmGamPoi2_estimate_overdispersions_fast(SEXP YSEXP, SEXP mean_matrixSEXP, SEXP model_matrixSEXP, SEXP do_cox_reid_adjustmentSEXP, SEXP n_subsamplesSEXP, SEXP max_iterSEXP) {
@@ -427,6 +443,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_glmGamPoi2_conventional_loglikelihood_fast", (DL_FUNC) &_glmGamPoi2_conventional_loglikelihood_fast, 7},
     {"_glmGamPoi2_conventional_score_function_fast", (DL_FUNC) &_glmGamPoi2_conventional_score_function_fast, 7},
     {"_glmGamPoi2_conventional_deriv_score_function_fast", (DL_FUNC) &_glmGamPoi2_conventional_deriv_score_function_fast, 7},
+    {"_glmGamPoi2_NR_overdispersion_mle", (DL_FUNC) &_glmGamPoi2_NR_overdispersion_mle, 6},
     {"_glmGamPoi2_estimate_overdispersions_fast", (DL_FUNC) &_glmGamPoi2_estimate_overdispersions_fast, 6},
     {"_glmGamPoi2_estimate_overdispersions_fast_delayed", (DL_FUNC) &_glmGamPoi2_estimate_overdispersions_fast_delayed, 7},
     {"_glmGamPoi2_estimate_global_overdispersions_fast", (DL_FUNC) &_glmGamPoi2_estimate_global_overdispersions_fast, 6},

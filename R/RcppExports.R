@@ -5,8 +5,8 @@ fisher_scoring_qr_step <- function(model_matrix, counts, mu, theta_times_mu) {
     .Call(`_glmGamPoi2_fisher_scoring_qr_step_mask`, model_matrix, counts, mu, theta_times_mu)
 }
 
-fisher_scoring_qr_ridge_step <- function(model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta) {
-    .Call(`_glmGamPoi2_fisher_scoring_qr_ridge_step_mask`, model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta)
+fisher_scoring_qr_ridge_step <- function(model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta_hat) {
+    .Call(`_glmGamPoi2_fisher_scoring_qr_ridge_step_mask`, model_matrix, counts, mu, theta_times_mu, ridge_penalty, ridge_target, beta_hat)
 }
 
 fisher_scoring_diagonal_step <- function(model_matrix, counts, mu, theta_times_mu) {
@@ -65,6 +65,10 @@ conventional_deriv_score_function_fast <- function(y, mu, log_theta, model_matri
     .Call(`_glmGamPoi2_conventional_deriv_score_function_fast`, y, mu, log_theta, model_matrix, do_cr_adj, unique_counts, count_frequencies)
 }
 
+NR_overdispersion_mle <- function(y, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter = 1000L, tolerance = 1e-8) {
+    .Call(`_glmGamPoi2_NR_overdispersion_mle`, y, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance)
+}
+
 estimate_overdispersions_fast <- function(Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter) {
     .Call(`_glmGamPoi2_estimate_overdispersions_fast`, Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter)
 }
@@ -85,7 +89,7 @@ estimate_overdispersions_nr_fast <- function(Y, mean_matrix, model_matrix, do_co
     .Call(`_glmGamPoi2_estimate_overdispersions_nr_fast`, Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, tolerance, do_parallel)
 }
 
-estimate_overdispersions_nr_fast_delayed <- function(Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter, tolerance = 1e-10, do_parallel = 0L) {
+estimate_overdispersions_nr_fast_delayed <- function(Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter, tolerance = 1e-8, do_parallel = 0L) {
     .Call(`_glmGamPoi2_estimate_overdispersions_nr_fast_delayed`, Y, model_matrix, offset_matrix, beta_mat_v, do_cox_reid_adjustment, n_subsamples, max_iter, tolerance, do_parallel)
 }
 

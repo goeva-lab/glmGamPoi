@@ -34,14 +34,14 @@ inline double compute_pen_sum(const EMB<D1> &beta_min_ridge_t, const EMB<D2> &ri
  * The function returns the new deviance.
  *
  */
-template <class D1, class D2, class D3, class D4, class D5, class D6, class Fn1>
+template <class D1, class D2, class D3, class D4, class D5, class D6, class FSConf>
 inline double decrease_deviance(
     // in-out params
     EMB<D1> &beta_hat, EMB<D2> &mu_hat,
     // const params
     const EMB<D3> &step, const EMB<D4> &model_matrix,
     // callback for computing gp deviance
-    const Fn1 &cgp_sum,
+    const FSConf &conf,
     // more const params
     const EMB<D5> &exp_off, const EMB<D6> &counts,
     // misc params
@@ -53,7 +53,7 @@ inline double decrease_deviance(
   const VectorXd mu_old = mu_hat;
   for (auto line_iter = 0;; line_iter++) {
     mu_hat = calculate_mu_mult<D2>(model_matrix, beta_hat, exp_off);
-    dev = cgp_sum(counts, mu_hat, theta, beta_hat);
+    dev = conf.gpd_sum(counts, mu_hat, theta, beta_hat);
     const double conv_test = std::fabs(dev - dev_old) / (std::fabs(dev) + 0.1);
     const double mu_rel_change = mu_hat.cwiseQuotient(mu_old).maxCoeff();
     if ((dev < dev_old && mu_rel_change < max_rel_mu_change) || conv_test < tolerance) {
@@ -71,16 +71,65 @@ inline double decrease_deviance(
   return dev;
 }
 
-template <class D1, class D2, class D3, class Fn1> class BetaOptim {
+class FisherScoreQR {
+public:
+  template <class D1, class D2, class D3>
+  inline double gpd_sum(const EMB<D1> &y, const EMB<D2> &mu, const double theta, const EMB<D3> &beta_hat) const {
+    return compute_gp_deviance_sum(y, mu, theta);
+  }
+  template <class D1, class D2, class D3, class D4, class D5>
+  inline VectorXd fs_step(const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &mu, const EMB<D4> &theta_times_mu,
+                              const EMB<D5> &beta_hat) const {
+    return fisher_scoring_qr_step(model_matrix, counts, mu, theta_times_mu);
+  }
+};
+
+template <class D1, class D2> class FisherScoreQRwRidge {
 private:
-  const Fn1 &cgp_sum_;
+  const EMB<D1> &ridge_target_;
+  const EMB<D2> &ridge_penalty_;
+  const double &n_samples_;
+  const MatrixXd ridge_penalty_sq_;
+
+public:
+  FisherScoreQRwRidge(const EMB<D1> &ridge_target, const EMB<D2> &ridge_penalty, const double &n_samples)
+      : ridge_target_(ridge_target), ridge_penalty_(ridge_penalty), n_samples_(n_samples),
+        ridge_penalty_sq_(ridge_penalty.transpose() * ridge_penalty) {}
+
+  template <class D3, class D4, class D5>
+  inline double gpd_sum(const EMB<D3> &y, const EMB<D4> &mu, const double theta, const EMB<D5> &beta_hat) const {
+    return compute_gp_deviance_sum(y, mu, theta) + compute_pen_sum(beta_hat - ridge_target_, ridge_penalty_sq_, n_samples_);
+  }
+  template <class D4, class D5, class D6, class D7, class D8>
+  inline VectorXd fs_step(const EMB<D4> &model_matrix, const EMB<D5> &counts, const EMB<D6> &mu, const EMB<D7> &theta_times_mu,
+                              const EMB<D8> &beta_hat) const {
+    return fisher_scoring_qr_ridge_step(model_matrix, counts, mu, theta_times_mu, ridge_penalty_, ridge_target_, beta_hat);
+  }
+};
+
+class FisherScoreDiagApprox {
+public:
+  template <class D1, class D2, class D3>
+  inline double gpd_sum(const EMB<D1> &y, const EMB<D2> &mu, const double theta, const EMB<D3> &beta_hat) const {
+    return compute_gp_deviance_sum(y, mu, theta);
+  }
+  template <class D1, class D2, class D3, class D4, class D5>
+  inline VectorXd fs_step(const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &mu, const EMB<D4> &theta_times_mu,
+                              const EMB<D5> &beta_hat) const {
+    return fisher_scoring_diagonal_step(model_matrix, counts, mu, theta_times_mu);
+  }
+};
+
+template <class D1, class D2, class D3, class FSConf> class BetaOptim {
+private:
+  const FSConf &conf_;
   const EMB<D1> &model_matrix_;
   const EMB<D2> &counts_;
   const EMB<D3> &exp_off_;
   const double &theta_;
   const double &eps_;
   inline double fn_(const VectorXd &beta_row) const {
-    return cgp_sum_(counts_, calculate_mu_mult<VectorXd>(model_matrix_, beta_row, exp_off_), theta_, beta_row);
+    return conf_.gpd_sum(counts_, calculate_mu_mult<VectorXd>(model_matrix_, beta_row, exp_off_), theta_, beta_row);
   }
   inline void grad_(VectorXd &x, VectorXd &grad) const {
     auto x_begin = x.begin();
@@ -98,8 +147,8 @@ private:
   }
 
 public:
-  BetaOptim(const Fn1 &cgp_sum, const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &exp_off, const double &theta, const double &eps)
-      : cgp_sum_(cgp_sum), model_matrix_(model_matrix), counts_(counts), exp_off_(exp_off), theta_(theta), eps_(eps) {};
+  BetaOptim(const FSConf &conf, const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &exp_off, const double &theta, const double &eps)
+      : conf_(conf), model_matrix_(model_matrix), counts_(counts), exp_off_(exp_off), theta_(theta), eps_(eps) {};
   inline double operator()(const VectorXd &x, VectorXd &grad) const {
     // we need to make a copy of input since it is provided as a const reference
     VectorXd x_c = x;
@@ -108,14 +157,14 @@ public:
   }
 };
 
-template <class D1, class D2, class D3, class Fn1>
+template <class D1, class D2, class D3, class FSConf>
 inline void fitBeta_FS_optim_step(
     // in-out params
     VectorXd &beta_out, double &dev_out, int &iters_out,
     // const params
     const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &exp_off,
     // callback for optim
-    const Fn1 &cgp_sum,
+    const FSConf &conf,
     // other params
     const double theta, const int max_iter) {
   LBFGSpp::LBFGSParam params;
@@ -128,9 +177,9 @@ inline void fitBeta_FS_optim_step(
   // NocedalWright linesearch fails to find value, using MoreThuente instead
   LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
 
-  // default used by the Eigen::NumericalDiff module 
+  // default used by the Eigen::NumericalDiff module
   const auto eps = SQRT_DBL_EPS;
-  const BetaOptim f(cgp_sum, model_matrix, counts, exp_off, theta, eps);
+  const BetaOptim f(conf, model_matrix, counts, exp_off, theta, eps);
   double fx;
 
   iters_out = solver.minimize(f, beta_out, fx);
@@ -143,14 +192,14 @@ inline void fitBeta_FS_optim_step(
   dev_out = fx;
 }
 
-template <class D1, class D2, class D3, class D4, class Fn1, class Fn2>
+template <class D1, class D2, class D3, class D4, class FSConf>
 inline void fitBeta_FS_internal_step(
     // in-out params
     EMB<D1> &beta_out, double &dev_out, int &iters_out,
     // const params
     const EMB<D2> &model_matrix, const EMB<D3> &counts, const EMB<D4> &exp_off,
     // callbacks for steps
-    const Fn1 &cgp_sum, const Fn2 &fisher_step,
+    const FSConf &conf,
     // other params
     const double theta, const double tolerance, const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim) {
 
@@ -166,14 +215,13 @@ inline void fitBeta_FS_internal_step(
   }
 
   // Init deviance
-  double dev_old = cgp_sum(counts, mu_hat, theta, beta_hat);
+  double dev_old = conf.gpd_sum(counts, mu_hat, theta, beta_hat);
   int iter = 0;
   for (; iter < max_iter; iter++) {
     // Find good direction to optimize beta
-    const VectorXd step = fisher_step(model_matrix, counts, mu_hat, theta * mu_hat, beta_hat);
+    const VectorXd step = conf.fs_step(model_matrix, counts, mu_hat, theta * mu_hat, beta_hat);
     // Find step size that actually decreases the deviance
-    const double dev =
-        decrease_deviance(beta_hat, mu_hat, step, model_matrix, cgp_sum, exp_off, counts, theta, dev_old, tolerance, max_rel_mu_change);
+    const double dev = decrease_deviance(beta_hat, mu_hat, step, model_matrix, conf, exp_off, counts, theta, dev_old, tolerance, max_rel_mu_change);
 
     const double conv_test = std::fabs(dev - dev_old) / (std::fabs(dev) + 0.1);
     dev_old = dev;
@@ -190,7 +238,7 @@ inline void fitBeta_FS_internal_step(
 
   if (try_recov_w_optim && iter == max_iter) {
     beta_hat = beta_out; // re-copy since from reference since values have been overwritten
-    fitBeta_FS_optim_step(beta_hat, dev_old, iter, model_matrix, counts, exp_off, cgp_sum, theta, max_iter);
+    fitBeta_FS_optim_step(beta_hat, dev_old, iter, model_matrix, counts, exp_off, conf, theta, max_iter);
   }
 
   beta_out = beta_hat;

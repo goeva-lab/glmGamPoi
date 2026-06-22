@@ -293,11 +293,11 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
 }
 
 template <class D1, class D2, class D3>
-inline void overdispersion_mle_NR_impl(double &est, int &iters_out, std::string &msg, const EMB<D1> &y, const EMB<D2> &mean_vector,
+inline void overdispersion_mle_NR_impl(double &est_out, int &iters_out, std::string &msg_out, const EMB<D1> &y, const EMB<D2> &mean_vector,
                                        const EMB<D3> &model_matrix, const bool do_cox_reid_adjustment, const int max_iter, const double tol) {
   if (y.isZero()) {
-    est = 0;
-    msg = "All counts y are 0";
+    est_out = 0;
+    msg_out = "All counts y are 0";
     iters_out = 0;
   }
 
@@ -311,8 +311,8 @@ inline void overdispersion_mle_NR_impl(double &est, int &iters_out, std::string 
       conventional_score_function_fast_impl(y, mean_vec_clamp, -20, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
 
   if (far_left_value < 0) {
-    est = 0;
-    msg = "Even for very small theta, no maximum identified";
+    est_out = 0;
+    msg_out = "Even for very small theta, no maximum identified";
     iters_out = 0;
   }
 
@@ -331,11 +331,11 @@ inline void overdispersion_mle_NR_impl(double &est, int &iters_out, std::string 
 
   // if failed and cox-reid adjustment is used: try w/o cox-reid adjustment
   if (do_cox_reid_adjustment && (iters_out == max_iter)) {
-    msg = "Estimated overdispersion w/o cox-reid adjustment";
+    msg_out = "Estimated overdispersion w/o cox-reid adjustment";
     opt_theta(log_theta, iters_out, y, mean_vec_clamp, model_matrix, false, tol, SQRT_DBL_EPS, unique_counts, count_frequencies);
   }
 
-  est = std::exp(log_theta);
+  est_out = std::exp(log_theta);
 }
 
 #endif
