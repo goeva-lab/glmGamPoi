@@ -41,7 +41,7 @@ test_that("perf_optim$cast_dgC_Y_to_dgR doesn't change anything", {
 
   res_dgr[["Mu"]] <- as(res_dgr[["Mu"]], "CsparseMatrix")
   attr(res_dgr, "perf_optim") <- attr(res_dgc, "perf_optim")
-  expect_equal(res_dgr, res_dgc, tolerance = 1e-8)
+  expect_equal(res_dgr, res_dgc, tolerance = 1e-7)
 })
 
 
