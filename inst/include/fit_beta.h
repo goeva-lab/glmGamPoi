@@ -2,14 +2,13 @@
 #define FIT_BETA_H
 
 #include <calc_helpers.h>
-#include <deviance_eigen.h>
-#include <fisher_scoring_steps_eigen.h>
+#include <deviance.h>
+#include <fisher_scoring_steps.h>
 #include <opt_max.h>
 
 #include <utility> // for std::as_const
 
 #include <Eigen/Dense>
-#include <utility>
 template <class D> using EMB = Eigen::MatrixBase<D>;
 using Eigen::ArrayXd;
 using Eigen::VectorXd;

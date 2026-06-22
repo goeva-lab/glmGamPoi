@@ -1,4 +1,4 @@
-#include <deviance_eigen.h>
+#include <deviance.h>
 
 // [[Rcpp::depends(RcppEigen)]]
 #include <RcppEigen.h>

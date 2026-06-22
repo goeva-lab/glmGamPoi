@@ -1,4 +1,4 @@
-#include <fit_beta_eigen.h>
+#include <fit_beta.h>
 #include <par_helpers.h>
 #include <tatami_helpers.h>
 

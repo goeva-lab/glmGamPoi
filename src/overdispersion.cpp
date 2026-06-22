@@ -1,5 +1,5 @@
 #include <calc_helpers.h>
-#include <overdispersion_eigen.h>
+#include <overdispersion.h>
 #include <par_helpers.h>
 #include <tatami_helpers.h>
 
