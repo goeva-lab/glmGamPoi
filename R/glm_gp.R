@@ -95,9 +95,6 @@
 #'   \itemize{
 #'     \item `offset_as_vec`: if `offset` is provided as either a constant or a vector of per-sample offsets,
 #'       `Offset` will be a vector instead of a matrix to avoid generating a dense n_sample * n_genes matrix
-#'     \item `mu_dropout_thresh`: if set to a numeric-like value greater than zero and `offset_as_vec` is enabled,
-#'        then during `Mu` matrix construction, values less than `mu_dropout_thresh` will
-#'        be replaced with zeroes, and `Mu` will be constructed as a [dgCMatrix][Matrix::dgCMatrix-class],
 #'     \item `cast_dgC_Y_to_dgR`: data matrix will be internally converted to row-major format to improve memory access patterns
 #'        as internal steps fetch data row-wise on a per-gene basis
 #'     \item `do_parallel`: if value greater than zero, then enables parallelization for model parameter fitting processes

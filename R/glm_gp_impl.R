@@ -104,9 +104,9 @@ glm_gp_impl <- function(Y, model_matrix,
   # Calculate corresponding predictions
   # Mu <- exp(Beta %*% t(model_matrix) + offset_matrix)
   Mu <- if(perf_optim[["delay_mu"]]){
-    mk_delayed_mu(Beta, model_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
+    mk_delayed_mu(Beta, model_matrix, offset_matrix)
   }else{
-    calculate_mu(Beta, model_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
+    calculate_mu(Beta, model_matrix, offset_matrix)
   }
 
   # Make estimate of over-disperion
@@ -160,9 +160,9 @@ glm_gp_impl <- function(Y, model_matrix,
 
     # Calculate corresponding predictions
     Mu <- if(perf_optim[["delay_mu"]]){
-      mk_delayed_mu(Beta, model_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
+      mk_delayed_mu(Beta, model_matrix, offset_matrix)
     }else{
-      calculate_mu(Beta, model_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
+      calculate_mu(Beta, model_matrix, offset_matrix)
     }
   }else if(isTRUE(overdispersion_shrinkage) || is.numeric(overdispersion_shrinkage)){
     # Given predefined disp_est shrink them
@@ -183,9 +183,9 @@ glm_gp_impl <- function(Y, model_matrix,
     Beta <- beta_res$Beta
     # Calculate corresponding predictions
     Mu <- if(perf_optim[["delay_mu"]]){
-      mk_delayed_mu(Beta, model_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
+      mk_delayed_mu(Beta, model_matrix, offset_matrix)
     }else{
-      calculate_mu(Beta, model_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
+      calculate_mu(Beta, model_matrix, offset_matrix)
     }
   }else{
     # Use disp_init, because it is already in vector shape

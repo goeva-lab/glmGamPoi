@@ -165,7 +165,7 @@ predict.glmGamPoi2 <- function(object, newdata = NULL,
     offset_matrix <- handle_offset_param_for_predict(offset, nrow = nrow(object$Beta),
                                     ncol = nrow(design_matrix), on_disk = on_disk, offset_as_vec = perf_optim[["offset_as_vec"]])
     if(verbose) message("Calculate 'Mu = exp(object$Beta %*% t(design_matrix) + Offset)'")
-    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix, perf_optim[["mu_dropout_thresh"]], perf_optim[["cast_dgC_Y_to_dgR"]])
+    Mu <- calculate_mu(object$Beta, design_matrix, offset_matrix)
     rownames(Mu) <- rownames(object$Beta)
     colnames(Mu) <- mu_colnames
   }
