@@ -297,9 +297,9 @@ glm_gp <- function(data,
   }
   if(is.function(res$Mu)){
     .old <- res$Mu
-    res$Mu <- function(obs = NULL, feats = NULL) {
-      o <- .old(obs, feats)
-      rownames(o) <- rownames(data)[feats]
+    res$Mu <- function(obs = NULL, feat = NULL) {
+      o <- .old(obs, feat)
+      rownames(o) <- rownames(data)[feat]
       colnames(o) <- colnames(data)[obs]
       o
     }

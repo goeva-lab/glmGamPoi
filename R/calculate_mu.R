@@ -15,22 +15,16 @@ calculate_mu <- function(Beta, model_matrix, offset_matrix) {
 }
 
 mk_delayed_mu <- function(Beta, model_matrix, offset) {
-  function(obs = NULL, feats = NULL) {
-    if (!is.null(feats)) {
-      stopifnot(is.integer(feats) && all(feats > 0 & feats <= nrow(Beta)))
-      Beta <- Beta[feats, ]
-      if (!is.vector(offset)) {
-        offset <- offset[feats, ]
-      }
+  function(obs = NULL, feat = NULL) {
+    if (!is.null(feat)) {
+      feat <- handle_sub_param(nrow(Beta), feat)
+      Beta <- Beta[feat, ]
+      if (!is.vector(offset)) { offset <- offset[feat, ] }
     }
     if (!is.null(obs)) {
-      stopifnot(is.integer(obs) && all(obs > 0 & obs <= nrow(model_matrix)))
+      obs <- handle_sub_param(nrow(model_matrix), obs)
       model_matrix <- model_matrix[obs, ]
-      if (is.vector(offset)) {
-        offset <- offset[obs]
-      } else {
-        offset <- offset[, obs]
-      }
+      offset <- if (is.vector(offset)) { offset[obs] } else { offset[, obs] }
     }
     calculate_mu(Beta, model_matrix, offset)
   }

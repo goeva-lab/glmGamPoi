@@ -42,6 +42,8 @@
 #' @param verbose a boolean that indicates if information about the individual steps are
 #'   printed while predicting. Default: `FALSE`.
 #' @param perf_optim see [glm_gp()] parameter of same name
+#' @param feat.sub subset of features to compute residuals for, ignored if `NULL`. Default: `NULL`
+#' @param obs.sub subset of observations to compute residuals for, ignored if `NULL`. Default: `NULL`
 #' @param ... currently ignored.
 #'
 #' @details
@@ -113,18 +115,46 @@ predict.glmGamPoi2 <- function(object, newdata = NULL,
                               offset = mean(object$Offset),
                               perf_optim = attr(object, "perf_optim"),
                               on_disk = NULL, verbose = FALSE,
+                              feat.sub = NULL, obs.sub = NULL,
                               ...){
 
   type <- match.arg(type, c("link", "response"))
-  if(is.function(object$Mu)){
-    object$Mu <- object$Mu()
+  if (se.fit) {
+    if(!is.null(feat.sub)) {
+      feat.sub <- NULL
+      warning("feat.sub argument is not supported when se.fit is TRUE, ignoring it.")
+    }
+    if(!is.null(obs.sub)) {
+      obs.sub <- NULL
+      warning("obs.sub argument is not supported when se.fit is TRUE, ignoring it.")
+    }
+  }
+  if(!is.null(feat.sub)) {
+    feat.sub <- handle_sub_param(rownames(object$data), feat.sub)
+    if (!is.vector(offset)) { offset <- offset[feat.sub, , drop=FALSE] }
+    object$overdispersions <- object$overdispersions[feat.sub]
+  }
+  if(!is.null(obs.sub)) {
+    obs.sub <- handle_sub_param(colnames(object$data), obs.sub)
+    object$model_matrix <- object$model_matrix[obs.sub,, drop=FALSE]
+    offset <- if (is.vector(offset)) { offset[obs.sub] } else { offset[, obs.sub, drop=FALSE] }
   }
   if(is.null(newdata)){
     # Easy, just return mu
     if(verbose) message("'newdata' is NULL, use 'Mu = object$Mu'")
     Mu <- object$Mu
+    if (is.function(Mu)) {
+      Mu <- Mu(feat = feat.sub, obs = obs.sub)
+    } else {
+      if (!is.null(feat.sub)) { Mu <- Mu[feat.sub, , drop=FALSE] }
+      if (!is.null(obs.sub)) { Mu <- Mu[, obs.sub, drop=FALSE] }
+    }
     design_matrix <- object$model_matrix
   }else{
+    if (!is.null(feat.sub)) {
+      object$Beta <- object$Beta[feat.sub, , drop=FALSE]
+    }
+
     # Do something with newdata
     if(is.matrix(newdata)){
       if(verbose) message("'newdata' is a matrix, set 'design_matrix = newdata'")
