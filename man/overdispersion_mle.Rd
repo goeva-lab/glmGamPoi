@@ -13,7 +13,7 @@ overdispersion_mle(
   subsample = FALSE,
   max_iter = 200,
   verbose = FALSE,
-  use_lbfgs_impl = FALSE,
+  use_nr_overdisp_impl = FALSE,
   do_parallel = 0
 )
 }

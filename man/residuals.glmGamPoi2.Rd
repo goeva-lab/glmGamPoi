@@ -7,6 +7,8 @@
 \method{residuals}{glmGamPoi2}(
   object,
   type = c("deviance", "pearson", "randomized_quantile", "working", "response"),
+  feat.sub = NULL,
+  obs.sub = NULL,
   ...
 )
 }
@@ -16,6 +18,10 @@
 
 \item{type}{the type of residual that is calculated. See details for more information.
 Default: \code{"deviance"}.}
+
+\item{feat.sub}{subset of features to compute residuals for, ignored if \code{NULL}. Default: \code{NULL}}
+
+\item{obs.sub}{subset of observations to compute residuals for, ignored if \code{NULL}. Default: \code{NULL}}
 
 \item{...}{currently ignored.}
 }

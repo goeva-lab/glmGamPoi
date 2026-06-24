@@ -13,6 +13,8 @@
   perf_optim = attr(object, "perf_optim"),
   on_disk = NULL,
   verbose = FALSE,
+  feat.sub = NULL,
+  obs.sub = NULL,
   ...
 )
 }
@@ -60,6 +62,10 @@ the result is calculated on disk depending if \code{offset} is stored on disk.}
 
 \item{verbose}{a boolean that indicates if information about the individual steps are
 printed while predicting. Default: \code{FALSE}.}
+
+\item{feat.sub}{subset of features to compute residuals for, ignored if \code{NULL}. Default: \code{NULL}}
+
+\item{obs.sub}{subset of observations to compute residuals for, ignored if \code{NULL}. Default: \code{NULL}}
 
 \item{...}{currently ignored.}
 }

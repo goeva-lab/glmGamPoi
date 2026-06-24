@@ -86,9 +86,6 @@ A list of currently specified optimizations is provided below:
 \itemize{
 \item \code{offset_as_vec}: if \code{offset} is provided as either a constant or a vector of per-sample offsets,
 \code{Offset} will be a vector instead of a matrix to avoid generating a dense n_sample * n_genes matrix
-\item \code{mu_dropout_thresh}: if set to a numeric-like value greater than zero and \code{offset_as_vec} is enabled,
-then during \code{Mu} matrix construction, values less than \code{mu_dropout_thresh} will
-be replaced with zeroes, and \code{Mu} will be constructed as a \link[Matrix:dgCMatrix-class]{dgCMatrix},
 \item \code{cast_dgC_Y_to_dgR}: data matrix will be internally converted to row-major format to improve memory access patterns
 as internal steps fetch data row-wise on a per-gene basis
 \item \code{do_parallel}: if value greater than zero, then enables parallelization for model parameter fitting processes
@@ -96,7 +93,7 @@ the number of threads used is equal to the provided integer
 \item \code{delay_mu}: Mu matrix is never explicitly formed, instead Mu field of output is provided as a function
 which can be called to materialize full matrix.
 IMPORTANT NOTE: \link{predict} and \link{residuals} methods will lead to a memory spike if this option is enabled, as they require the full Mu matrix to be present in memory.
-\item \code{use_lbfgs_impl}: uses the L-BFGS-B algorithm instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
+\item \code{use_nr_overdisp_impl}: uses a C++-implemented newton-raphson procedure instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
 }
 Default: \code{FALSE}, meaning no optimizations are made}
 
