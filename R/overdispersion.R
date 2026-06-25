@@ -162,11 +162,11 @@ overdispersion_mle_impl <- function(y, mean, model_matrix, do_cox_reid_adjustmen
   } else {
     # Do conventional optimization
     conventional_overdispersion_mle
-  })(y, mean_vector = mean, model_matrix = model_matrix, do_cox_reid_adjustment = do_cox_reid_adjustment, max_iter = max_iter, verbose = verbose)
+  })(y, mean_vector = mean, model_matrix = model_matrix, do_cox_reid_adjustment = do_cox_reid_adjustment, max_iter = max_iter)
 }
 
 
-conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 1000, verbose = FALSE) {
+conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 1000) {
   return_value <- list(estimate = NA_real_, iterations = NA_real_, message = "")
 
   tab <- make_table_if_small(y, stop_if_larger = length(y) / 2)

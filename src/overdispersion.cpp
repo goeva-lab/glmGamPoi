@@ -320,17 +320,15 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
     auto mean_mat_ext = tatami::consecutive_extractor<false>(mean_mat_bm, true, start, length);
     VectorXd counts(n_samples), mu(n_samples);
 
-    // use raw pointers w/ NULL to avoid initializing an RNG when not subsampling
-    std::default_random_engine *gen = NULL;
-    ArrayXi *idx = NULL;
+    // use pointers to avoid initializing an RNG when not subsampling
+    std::unique_ptr<std::default_random_engine> gen;
+    std::unique_ptr<std::vector<int>> idx;
     if (do_sub) {
-      std::default_random_engine rng_;
-      gen = &rng_;
+      gen = std::unique_ptr<std::default_random_engine>(new std::default_random_engine);
       // seed rng w/ value from R RNG to ensure reproducibility w/ set.seed from R
       gen->seed((int)Rcpp::runif(1, 0., (double)INT_MAX)(0));
 
-      ArrayXi idx_(n_samples);
-      idx = &idx_;
+      idx = std::unique_ptr<std::vector<int>>(new std::vector<int>(n_samples));
       std::iota(idx->begin(), idx->end(), 0);
     }
 
@@ -360,7 +358,8 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
       if (do_sub) {
         // dereferencing gen & idx is safe when gated against do_sub
         std::shuffle(idx->begin(), idx->end(), *gen);
-        const ArrayXi &idx_s = idx->operator()(Eigen::seqN(0, n_subsamples));
+        const std::vector<int> idx_s(idx->begin(), idx->begin() + n_subsamples);
+
         const VectorXd counts_s = counts_v(idx_s);
         const VectorXd mu_s = mu_v(idx_s);
         const MatrixXd mm_s = model_matrix(idx_s, Eigen::all);
@@ -416,17 +415,15 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
     }
     VectorXd counts(n_samples), off(n_samples);
 
-    // use raw pointers w/ NULL to avoid initializing an RNG when not subsampling
-    std::default_random_engine *gen = NULL;
-    ArrayXi *idx = NULL;
+    // use pointers to avoid initializing an RNG when not subsampling
+    std::unique_ptr<std::default_random_engine> gen;
+    std::unique_ptr<std::vector<int>> idx;
     if (do_sub) {
-      std::default_random_engine rng_;
-      gen = &rng_;
+      gen = std::unique_ptr<std::default_random_engine>(new std::default_random_engine);
       // seed rng w/ value from R RNG to ensure reproducibility w/ set.seed from R
       gen->seed((int)Rcpp::runif(1, 0., (double)INT_MAX)(0));
 
-      ArrayXi idx_(n_samples);
-      idx = &idx_;
+      idx = std::unique_ptr<std::vector<int>>(new std::vector<int>(n_samples));
       std::iota(idx->begin(), idx->end(), 0);
     }
 
@@ -448,7 +445,8 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
       if (do_sub) {
         // dereferencing gen & idx is safe when gated against do_sub
         std::shuffle(idx->begin(), idx->end(), *gen);
-        const ArrayXi &idx_s = idx->operator()(Eigen::seqN(0, n_subsamples));
+        const std::vector<int> idx_s(idx->begin(), idx->begin() + n_subsamples);
+
         const VectorXd counts_s = counts_v(idx_s);
         const VectorXd off_s = off_v(idx_s);
         const MatrixXd mm_s = model_matrix(idx_s, Eigen::all);

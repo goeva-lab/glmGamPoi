@@ -122,8 +122,7 @@ test_that("overdispersion_mle can handle weird input 1", {
   # because mean was exactly equal to var
   est_2 <- conventional_overdispersion_mle(y, mean_vector = mu,
                                   model_matrix = X,
-                                  do_cox_reid_adjustment = TRUE,
-                                  verbose = FALSE)
+                                  do_cox_reid_adjustment = TRUE)
   expect_true(TRUE)
 })
 
@@ -135,8 +134,7 @@ test_that("overdispersion_mle can handle weird input 2", {
   # This used to fail because mean was exactly equal to var
   est_2 <- conventional_overdispersion_mle(y, mean_vector = mu,
                                            model_matrix = X,
-                                           do_cox_reid_adjustment = TRUE,
-                                           verbose = FALSE)
+                                           do_cox_reid_adjustment = TRUE)
   expect_true(TRUE)
 })
 
@@ -146,8 +144,7 @@ test_that("overdispersion_mle can handle weird input 3", {
   mu <- rep(0.7, 400)
   est <- conventional_overdispersion_mle(y, mean_vector = mu,
                                            model_matrix = X,
-                                           do_cox_reid_adjustment = TRUE,
-                                           verbose = FALSE)
+                                           do_cox_reid_adjustment = TRUE)
 
   expect_lt(est$estimate, 1e8)
 })
