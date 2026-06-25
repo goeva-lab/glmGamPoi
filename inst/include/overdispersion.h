@@ -299,6 +299,7 @@ inline void overdispersion_mle_NR_impl(double &est_out, int &iters_out, std::str
     est_out = 0;
     msg_out = "All counts y are 0";
     iters_out = 0;
+    return;
   }
 
   // replace zeroes w/ 1e-6 because zeroes can cause issues (with approximate accuracy of 1e-32)
@@ -314,6 +315,7 @@ inline void overdispersion_mle_NR_impl(double &est_out, int &iters_out, std::str
     est_out = 0;
     msg_out = "Even for very small theta, no maximum identified";
     iters_out = 0;
+    return;
   }
 
   const auto mu = y.mean();
