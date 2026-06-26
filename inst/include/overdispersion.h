@@ -346,7 +346,7 @@ inline void overdispersion_mle_NR_impl(double &est_out, int &iters_out, std::str
   // save to variable in case we need to restart w/o cox-reid adjustment
   const auto log_theta_init = log_theta;
 
-  // initial value of iters_out is used by opt-tehta to signal max iters count
+  // initial value of iters_out is used by opt_theta to signal max iters count
   iters_out = max_iter;
 
   // try to optimize theta
