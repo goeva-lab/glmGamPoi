@@ -18,13 +18,13 @@ mk_delayed_mu <- function(Beta, model_matrix, offset) {
   function(obs = NULL, feat = NULL) {
     if (!is.null(feat)) {
       feat <- handle_sub_param(nrow(Beta), feat)
-      Beta <- Beta[feat, ]
-      if (!is.vector(offset)) { offset <- offset[feat, ] }
+      Beta <- Beta[feat, , drop = FALSE]
+      if (!is.vector(offset)) { offset <- offset[feat, , drop = FALSE] }
     }
     if (!is.null(obs)) {
       obs <- handle_sub_param(nrow(model_matrix), obs)
-      model_matrix <- model_matrix[obs, ]
-      offset <- if (is.vector(offset)) { offset[obs] } else { offset[, obs] }
+      model_matrix <- model_matrix[obs, , drop = FALSE]
+      offset <- if (is.vector(offset)) { offset[obs] } else { offset[, obs, drop = FALSE] }
     }
     calculate_mu(Beta, model_matrix, offset)
   }
