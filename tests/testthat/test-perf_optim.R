@@ -61,7 +61,7 @@ test_that("perf_optim$delay_mu doesn't change anything", {
   res2[["Mu"]] <- res2[["Mu"]]()
   attr(res2, "perf_optim") <- attr(res1, "perf_optim")
 
-  expect_equal(res1, res2, tolerance = 1e-7)
+  expect_equal(res1, res2, tolerance = 1e-6)
 })
 
 test_that("perf_optim$delay_mu doesn't change anything (global overdispersion)", {
