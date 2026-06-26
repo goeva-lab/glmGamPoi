@@ -66,17 +66,17 @@ inline double optimize_fmax(const Fn1 &f, const double x_min = -30., const doubl
 
   for (;;) {
     xm = (a + b) * .5;
-    tol1 = eps * std::fabs(x) + tol3;
+    tol1 = eps * std::abs(x) + tol3;
     t2 = tol1 * 2.;
 
     /* check stopping criterion */
 
-    if (std::fabs(x - xm) <= t2 - (b - a) * .5)
+    if (std::abs(x - xm) <= t2 - (b - a) * .5)
       break;
     p = 0.;
     q = 0.;
     r = 0.;
-    if (std::fabs(e) > tol1) { /* fit parabola */
+    if (std::abs(e) > tol1) { /* fit parabola */
 
       r = (x - w) * (fx - fv);
       q = (x - v) * (fx - fw);
@@ -90,7 +90,7 @@ inline double optimize_fmax(const Fn1 &f, const double x_min = -30., const doubl
       e = d;
     }
 
-    if (std::fabs(p) >= std::fabs(q * .5 * r) || p <= q * (a - x) || p >= q * (b - x)) { /* a golden-section step */
+    if (std::abs(p) >= std::abs(q * .5 * r) || p <= q * (a - x) || p >= q * (b - x)) { /* a golden-section step */
 
       if (x < xm)
         e = b - x;
@@ -113,7 +113,7 @@ inline double optimize_fmax(const Fn1 &f, const double x_min = -30., const doubl
 
     /* f must not be evaluated too close to x */
 
-    if (std::fabs(d) >= tol1)
+    if (std::abs(d) >= tol1)
       u = x + d;
     else if (d > 0.)
       u = x + tol1;

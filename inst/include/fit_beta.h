@@ -53,7 +53,7 @@ inline double decrease_deviance(
   for (auto line_iter = 0;; line_iter++) {
     mu_hat = calculate_mu_mult<D2>(model_matrix, beta_hat, exp_off);
     dev = conf.gpd_sum(counts, mu_hat, theta, beta_hat);
-    const double conv_test = std::fabs(dev - dev_old) / (std::fabs(dev) + 0.1);
+    const double conv_test = std::abs(dev - dev_old) / (std::abs(dev) + 0.1);
     const double mu_rel_change = mu_hat.cwiseQuotient(mu_old).maxCoeff();
     if ((dev < dev_old && mu_rel_change < max_rel_mu_change) || conv_test < tolerance) {
       break; // while loop
@@ -222,7 +222,7 @@ inline void fitBeta_FS_internal_step(
     // Find step size that actually decreases the deviance
     const double dev = decrease_deviance(beta_hat, mu_hat, step, model_matrix, conf, exp_off, counts, theta, dev_old, tolerance, max_rel_mu_change);
 
-    const double conv_test = std::fabs(dev - dev_old) / (std::fabs(dev) + 0.1);
+    const double conv_test = std::abs(dev - dev_old) / (std::abs(dev) + 0.1);
     dev_old = dev;
     if (std::isnan(conv_test)) {
       // This should not happen
@@ -295,7 +295,7 @@ inline void fitBeta_NR_internal_step(
 
     const double step = dl / ddl;
     beta += step;
-    if ((std::fabs(step) < tolerance) || (std::isnan(beta))) {
+    if ((std::abs(step) < tolerance) || (std::isnan(beta))) {
       break;
     }
   }
