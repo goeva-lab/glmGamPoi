@@ -157,16 +157,14 @@ overdispersion_mle_impl <- function(y, mean, model_matrix, do_cox_reid_adjustmen
   stopifnot(all(is.finite(y)))
   stopifnot(all(is.finite(mean)))
 
-  (if (use_nr_overdisp_impl) {
-    NR_overdispersion_mle
-  } else {
-    # Do conventional optimization
-    conventional_overdispersion_mle
-  })(y, mean_vector = mean, model_matrix = model_matrix, do_cox_reid_adjustment = do_cox_reid_adjustment, max_iter = max_iter)
+  conventional_overdispersion_mle(y, mean_vector = mean, model_matrix = model_matrix, do_cox_reid_adjustment = do_cox_reid_adjustment, max_iter = max_iter, use_nr_overdisp_impl = use_nr_overdisp_impl)
 }
 
 
-conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 1000) {
+conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 1000, use_nr_overdisp_impl = FALSE) {
+  if(use_nr_overdisp_impl) {
+    return(NR_overdispersion_mle(initializeCpp(y), initializeCpp(mean_vector), model_matrix, do_cox_reid_adjustment, max_iter))
+  }
   return_value <- list(estimate = NA_real_, iterations = NA_real_, message = "")
 
   tab <- make_table_if_small(y, stop_if_larger = length(y) / 2)
