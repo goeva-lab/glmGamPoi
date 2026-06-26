@@ -1,0 +1,63 @@
+# glmGamPoi(2/fork) explainer
+
+code in this repo after commit `8d9a005` represents work done to optimize glmGamPoi for enhanced compatibility w/ large-scale sparse/scRNA-seq data.
+
+an explicit aim of this project has been to allow for upstream-ing of the relevant code into the upstream ([`const-ae/glmGamPoi`](https://github.com/const-ae/glmGamPoi)) repo.
+
+> [!IMPORTANT]
+> to allow for easier testing / comparison against the original package to catch regressions, the package & main exported class have been renamed to `glmGamPoi2`.
+> this change is intended to be temporary and to be reverted should we merge into upstream.
+
+## user-facing changes
+
+the main user-facing consequence of these changes is the addition of the `perf_optim` list parameter to `glm_gp`, which controls various steps taken for optimization.
+
+parameters for this option include:
+
+- `offset_as_vec`: storing the offsets as a vector in the case where offsets are set uniquely in a per-cell manner (which is true for the overwhelming majority of use-cases)
+- `do_parallel`: allows setting core count for parallelizing various steps
+- `delay_mu`: never explicitly form the Mu (prediction) matrix, instead returning a function which can return slices of the matrix as necessary
+- `use_nr_overdisp_impl`: utilize an alternative implementation for overdispersion estimation, which is written in C++ and is thread safe, allowing for parallelization of this step
+
+by default, none of these options are enabled, as an explicit goal is that no changes should affect user outputs after having upgraded unless explicitly desired.
+
+## internal changes
+
+internally, these changes have required relatively significant changes to package internals (R and C++), with the main changes being:
+
+- a re-write of C++ internals to utilize Eigen instead of Armadillo for algebraic/matrix operations
+  - the reasoning for this is that Eigen makes stronger guarantees around thread-safety of its internals compared to Armadillo, which was necessary for this project given the aim to enable cross-gene parallelization of beta/overdispersion estimation steps
+  - while Armadillo offers some inherent parallelization, it appears heavily dependent on system configuration (e.g. OPENMP presence, etc.), leading to difficulties w/ consistent benchmarking, further motivating this design decision, given our interest in direct control of parallelization levels
+- threading the `perf_optim` relevant variable(s) throughout package internals as necessary
+- adding control flow to deal with alternate representations of Mu (prediction) and offset matrices
+
+> [!NOTE]
+> the latter two points non trivially increase (cyclomatic) complexity in the package (e.g. `is.vector(offset_matrix)`/`is.function(Mu)` checks in various function preludes, the branches in `overdispersion_mle`, etc.), worsening readability/parsability
+
+a test suite for relevant changes has also been added at [`test-perf_optim.R`](./tests/testthat/test-perf_optim.R)
+
+> [!IMPORTANT]
+> switching to using the NR-based overdispersion estimator causes four (4) tests to fail which previously passed:
+>
+> - [`test-estimate_betas.R:582:3`](./tests/testthat/test-estimate_betas.R#L582): mean relative diff of `-2.1e-05` in `deviances` (existing tolerance is `1.490116e-08`, testthat default)
+> - [`test-estimate_betas.R:583:3`](./tests/testthat/test-estimate_betas.R#L583): mean relative diff of `8.62e-07` in `overdispersions` (existing tolerance is `1.490116e-08`, testthat default)
+> - [`test-estimate_betas.R:584:3`](./tests/testthat/test-estimate_betas.R#L584): mean relative diff of `2.850992e-07` in `dispersion_trend` (existing tolerance is `1.490116e-08`, testthat default)
+> - [`test-test_de.R:24:3`](./tests/testthat/test-test_de.R#L24): mean relative diff of `0.1576794` (existing tolerance is `0.1`)
+
+## miscleanea
+
+other notable experiments were undertaken before being dismissed as non worthwhile:
+
+- `mu_dropout_thresh`: an attempt to improve memory usage by adding a dropout threshold to Mu matrix construction, allowing the matrix to be represented sparsely (reverted in `9b4cd99`)
+  - this was reverted because it lead to a noticeable drop in accuracy while leading to performance regressions
+  - moreover, decreases in memory use appeared negligeable
+- `cast_dgC_Y_to_dgR`: an attempt to improve memory access patterns in main functions by internally representing the counts matrix (when sparse) to row-major format, given that all accesses are by-row
+  - does not appear to lead to any performance gains, instead seems to cause notable regressions in runtime
+
+for easier benchmarking and evaluation, a singularity definition file [`./glmgp.def`](./glmgp.def) has been made.
+it generates an environment w/ both forked (under the `glmGamPoi2` name) original (as fetched from bioconductor) packages available.
+
+the build instructions are tuned to generate maximally-optimized builds (i.e. `-O3`) and leveraging all available CPU instructions available (i.e. `-march=native`).
+
+> [!WARNING]
+> this means that the resulting `sif` file should *__not__* be considered portable across CPUs (even of the same base architecture), and should be built on a per-node/machine basis
