@@ -240,19 +240,29 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
                       const EMB<D5> &count_frequencies) {
   const int max_iter = iters_out;
 
-  int iter = 0;
+  iters_out = 0;
   double step_size;
-  for (; iter < max_iter; iter++) {
+  for (; iters_out < max_iter; iters_out++) {
     const auto grad =
         conventional_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
-    const auto hess = conventional_deriv_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts,
-                                                                  count_frequencies);
+    const auto abs_hess = std::abs(conventional_deriv_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment,
+                                                                               unique_counts, count_frequencies));
 
-    const auto step = grad / hess;
-    log_theta_out -= step;
+    // clamp step at reasonable size to deal with numerical instability
+    const auto step = std::clamp(grad / abs_hess, -10.0, 10.0);
 
-    if (std::fabs(step) < tol) {
-      step_size = 2. / std::fabs(hess);
+    log_theta_out += step;
+
+    // we're operating on a log scale, value this large indicates something has gone wrong
+    if (log_theta_out > 50.0) {
+      log_theta_out = NAN;
+    }
+    if (std::isnan(log_theta_out)) {
+      return;
+    }
+
+    if (std::abs(step) < tol) {
+      step_size = 2. / abs_hess;
       break;
     }
   }
@@ -261,7 +271,7 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
   // as such, we proceed w/ a numerical derivative gradient ascent based adjustment of our newton-raphson result
   // the initial step size is estimated from the double of the inverse of the hessian from the newton-raphson step
   // even though we can't necessarily trust that output entirely, it should still serve as a useful guide (?)
-  for (; iter < max_iter; iter++) {
+  for (; iters_out < max_iter; iters_out++) {
     const auto v1 = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out + eps, model_matrix, do_cox_reid_adjustment, unique_counts,
                                                          count_frequencies);
     const auto v2 = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out - eps, model_matrix, do_cox_reid_adjustment, unique_counts,
@@ -269,7 +279,7 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
     const auto dir = (v1 - v2) / (2 * eps);
     auto step = dir * step_size;
 
-    if (std::fabs(step) < tol) {
+    if (std::abs(step) < tol) {
       break;
     }
 
@@ -285,11 +295,17 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
     }
     log_theta_out = cand;
 
+    // we're operating on a log scale, value this large indicates something has gone wrong
+    if (log_theta_out > 50.0) {
+      log_theta_out = NAN;
+    }
+    if (std::isnan(log_theta_out)) {
+      return;
+    }
+
     // decrease step size slightly for next iteration
     step_size *= 0.95;
   }
-
-  iters_out = iter;
 }
 
 template <class D1, class D2, class D3>
@@ -326,14 +342,20 @@ inline void overdispersion_mle_NR_impl(double &est_out, int &iters_out, std::str
   }
 
   log_theta = std::log(log_theta);
+
+  // save to variable in case we need to restart w/o cox-reid adjustment
+  const auto log_theta_init = log_theta;
+
+  // initial value of iters_out is used by opt-tehta to signal max iters count
   iters_out = max_iter;
 
   // try to optimize theta
   opt_theta(log_theta, iters_out, y, mean_vec_clamp, model_matrix, do_cox_reid_adjustment, tol, SQRT_DBL_EPS, unique_counts, count_frequencies);
 
   // if failed and cox-reid adjustment is used: try w/o cox-reid adjustment
-  if (do_cox_reid_adjustment && (iters_out == max_iter)) {
+  if (do_cox_reid_adjustment && ((iters_out == max_iter) || std::isnan(log_theta))) {
     msg_out = "Estimated overdispersion w/o cox-reid adjustment";
+    log_theta = log_theta_init;
     opt_theta(log_theta, iters_out, y, mean_vec_clamp, model_matrix, false, tol, SQRT_DBL_EPS, unique_counts, count_frequencies);
   }
 
