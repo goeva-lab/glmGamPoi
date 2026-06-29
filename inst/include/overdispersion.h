@@ -241,7 +241,7 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
   const int max_iter = iters_out;
 
   iters_out = 0;
-  double step_size;
+  double init_step_size;
   for (; iters_out < max_iter; iters_out++) {
     const auto grad =
         conventional_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
@@ -254,7 +254,7 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
     log_theta_out += step;
 
     // we're operating on a log scale, value this large indicates something has gone wrong
-    if (log_theta_out > 50.0) {
+    if (log_theta_out > 100.) {
       log_theta_out = NAN;
     }
     if (std::isnan(log_theta_out)) {
@@ -262,7 +262,7 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
     }
 
     if (std::abs(step) < tol) {
-      step_size = 2. / abs_hess;
+      init_step_size = 2. / abs_hess;
       break;
     }
   }
@@ -271,16 +271,22 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
   // as such, we proceed w/ a numerical derivative gradient ascent based adjustment of our newton-raphson result
   // the initial step size is estimated from the double of the inverse of the hessian from the newton-raphson step
   // even though we can't necessarily trust that output entirely, it should still serve as a useful guide (?)
-  for (; iters_out < max_iter; iters_out++) {
+  for (auto step_size = init_step_size; iters_out < max_iter; iters_out++) {
     const auto v1 = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out + eps, model_matrix, do_cox_reid_adjustment, unique_counts,
                                                          count_frequencies);
     const auto v2 = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out - eps, model_matrix, do_cox_reid_adjustment, unique_counts,
                                                          count_frequencies);
+
+    // if v1 and v2 are both l.t. the existing value (e.g. no actual increase in any direction), then we bail
+    if ((v1 < log_theta_out) && (v2 < log_theta_out)) {
+      return;
+    }
+
     const auto dir = (v1 - v2) / (2 * eps);
     auto step = dir * step_size;
 
     if (std::abs(step) < tol) {
-      break;
+      return;
     }
 
     const auto cur_val =
@@ -288,22 +294,33 @@ inline void opt_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, c
     auto cand = log_theta_out + step;
 
     // find step in numerical derivative direction that _actually_ increases the objective
-    while (conventional_loglikelihood_fast_impl(y, mean_vector, cand, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies) <
-           cur_val) {
+    for (const auto tol_div_dir = tol / std::abs(dir);;) {
+      if (conventional_loglikelihood_fast_impl(y, mean_vector, cand, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies) >
+          cur_val) {
+        break;
+      }
       step_size *= 0.618033988749;
+
+      // what we want to be checking for is `|dir * step_size| < tol`, but since `tol` and `dir` are constant here, we rephrase this as
+      // `step_size < tol / |dir|` (which is valid since we know that `step_size` and `tol` are g.t. 0)
+      if (step_size < tol_div_dir) {
+        // we've shrunk our step size below the tolerance and still not found a value that _increases_ the function, so we bail w/ the existing value
+        return;
+      }
+
       cand = log_theta_out + dir * step_size;
     }
     log_theta_out = cand;
 
     // we're operating on a log scale, value this large indicates something has gone wrong
-    if (log_theta_out > 50.0) {
+    if (log_theta_out > 100.) {
       log_theta_out = NAN;
     }
     if (std::isnan(log_theta_out)) {
       return;
     }
 
-    // decrease step size slightly for next iteration
+    // decrease step size slightly for next iteration of gradient ascent
     step_size *= 0.95;
   }
 }
