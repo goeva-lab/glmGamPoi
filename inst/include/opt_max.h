@@ -4,39 +4,37 @@
 #include <cfloat>
 #include <cmath>
 
-/* below is an adapted version of `Brent_fmin` taken from `src/library/stats/optimize.c` of the R source repo @ trunk 89985
- * it is only very lightly adapted to:
- - remove some unneeded interop w/ R in places
- - adapt to C++ conventions
- - maximize f instead of minimizing
- - minor reformatting (by clang-tidy)
+/*
+below is an adapted version of `Brent_fmin` taken from `src/library/stats/optimize.c` of the R source repo @ trunk 89985
+it is only very lightly adapted to:
+- remove unneeded interop code w/ R
+- adapt to C++ conventions
+- maximize f instead of minimizing
+- minor reformatting (by clang-tidy)
 
- * copyright declaration below:
- *
- *  R : A Computer Language for Statistical Data Analysis
- *  Copyright (C) 1998--2025  The R Core Team
- *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
- *  Copyright (C) 2003-2004  The R Foundation
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, a copy is available at
- *  https://www.R-project.org/Licenses/
- */
+copyright declaration below:
+  R : A Computer Language for Statistical Data Analysis
+  Copyright (C) 1998--2025  The R Core Team
+  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
+  Copyright (C) 2003-2004  The R Foundation
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, a copy is available at
+  https://www.R-project.org/Licenses/
+*/
 
 const double DEFAULT_TOL = std::pow(DBL_EPSILON, 0.25);
-
-template <class Fn1>
-inline double optimize_fmax(const Fn1 &f, const double x_min = -30., const double x_max = 30., const double tol = DEFAULT_TOL) {
+template <class Fn1> inline double optimize_fmax(const Fn1 &f, const double x_min = -30., const double x_max = 30., const double tol = DEFAULT_TOL) {
   /*  c is the squared inverse of the golden ratio */
   const double c = (3. - std::sqrt(5.)) * .5;
 
