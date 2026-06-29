@@ -136,7 +136,7 @@ predict.glmGamPoi2 <- function(object, newdata = NULL,
   }
   if(!is.null(obs.sub)) {
     obs.sub <- handle_sub_param(colnames(object$data), obs.sub)
-    object$model_matrix <- object$model_matrix[obs.sub,, drop=FALSE]
+    object$model_matrix <- object$model_matrix[obs.sub, , drop=FALSE]
     offset <- if (is.vector(offset)) { offset[obs.sub] } else { offset[, obs.sub, drop=FALSE] }
   }
   if(is.null(newdata)){
