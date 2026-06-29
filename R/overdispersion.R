@@ -161,7 +161,7 @@ overdispersion_mle_impl <- function(y, mean, model_matrix, do_cox_reid_adjustmen
 }
 
 
-conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 1000, use_nr_overdisp_impl = FALSE) {
+conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 200, use_nr_overdisp_impl = FALSE) {
   if(use_nr_overdisp_impl) {
     return(NR_overdispersion_mle(y, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter))
   }
