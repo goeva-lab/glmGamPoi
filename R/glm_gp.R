@@ -687,9 +687,8 @@ is_on_disk.glmGamPoi2 <- function(fit){
   is(fit$Mu, "DelayedMatrix") && is(DelayedArray::seed(fit$Mu), "HDF5ArraySeed")
 }
 
-#' @method [ glmGamPoi2
 #' @export
-"[.glmGamPoi2" <- function(x, i, j, ...) {
+filt <- function(x, i, j, ...) {
   # subset by observations
   if (!missing(j) && !is.null(j)) {
     j <- handle_sub_param(if (is.null(colnames(x[["data"]]))) { ncol(x[["data"]]) } else { colnames(x[["data"]]) }, j)
