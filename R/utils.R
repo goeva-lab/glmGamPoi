@@ -275,19 +275,30 @@ handle_Mu_rowmeans <- function(Mu, n.rows) {
 }
 
 handle_sub_param <- function(check.against, sub.param) {
-  if (is.integer(check.against) && length(check.against) == 1) {
-    stopifnot(is.integer(sub.param) && all(sub.param > 0 & sub.param <= check.against))
-    return(sub.param)
+  if (is.integer(check.against) && (length(check.against) == 1)) {
+    if (is.integer(sub.param)) {
+      stopifnot(all((sub.param > 0) & (sub.param <= check.against)))
+      return(sub.param)
+    }
+
+    stopifnot(is.logical(sub.param) && (length(sub.param) == check.against))
+    return(which(sub.param, useNames = FALSE))
   }
+
   stopifnot(is.vector(check.against, mode = "character"))
+
   if (is.character(sub.param)) {
     sub.idx <- pmatch(sub.param, check.against, duplicates.ok = TRUE)
     stopifnot(!anyNA(sub.idx))
 
-    sub.idx
-  } else {
-    stopifnot(is.integer(sub.param) && all(sub.param > 0 & sub.param <= check.against))
-
-    sub.param
+    return(sub.idx)
   }
+
+  if (is.logical(sub.param)) {
+    stopifnot(length(sub.param) == length(check.against))
+    return(which(sub.param, useNames = FALSE))
+  }
+
+  stopifnot(is.integer(sub.param) && all(sub.param > 0 & sub.param <= check.against))
+  sub.param
 }

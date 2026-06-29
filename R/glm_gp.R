@@ -687,4 +687,71 @@ is_on_disk.glmGamPoi2 <- function(fit){
   is(fit$Mu, "DelayedMatrix") && is(DelayedArray::seed(fit$Mu), "HDF5ArraySeed")
 }
 
+#' @method [ glmGamPoi2
+#' @export
+"[.glmGamPoi2" <- function(x, i, j, ...) {
+  # subset by observations
+  if (!missing(j) && !is.null(j)) {
+    j <- handle_sub_param(if (is.null(colnames(x[["data"]]))) { ncol(x[["data"]]) } else { colnames(x[["data"]]) }, j)
 
+    x[["data"]] <- x[["data"]][, j]
+
+    x[["size_factors"]] <- x[["size_factors"]][j]
+    x[["model_matrix"]] <- x[["model_matrix"]][j, , drop = FALSE]
+
+    if (is.vector(x[["Offset"]])) {
+      x[["Offset"]] <- x[["Offset"]][j]
+    } else {
+      x[["Offset"]] <- x[["Offset"]][, j, drop = FALSE]
+    }
+
+    if (is.function(x[["Mu"]])) {
+      .fn <- mk_delayed_mu(x[["Beta"]], x[["model_matrix"]], x[["Offset"]])
+      .rn <- rownames(x[["data"]])
+      .cn <- colnames(x[["data"]])
+      x[["Mu"]] <- function(...) {
+        o <- .fn(...)
+        rownames(o) <- .rn
+        colnames(o) <- .cn
+        o
+      }
+    } else {
+      x[["Mu"]] <- x[["Mu"]][, j, drop = FALSE]
+    }
+  }
+
+  # subset by gene
+  if (!missing(i) && !is.null(i)) {
+    i <- handle_sub_param(if (is.null(rownames(x[["data"]]))) { nrow(x[["data"]]) } else { rownames(x[["data"]]) }, i)
+
+    x[["data"]] <- x[["data"]][i, ]
+
+    x[["Beta"]] <- x[["Beta"]][i, , drop = FALSE]
+    x[["overdispersions"]] <- x[["overdispersions"]][i]
+    x[["overdispersion_shrinkage_list"]][["dispersion_trend"]] <- x[["overdispersion_shrinkage_list"]][["dispersion_trend"]][i]
+    x[["overdispersion_shrinkage_list"]][["ql_disp_estimate"]] <- x[["overdispersion_shrinkage_list"]][["ql_disp_estimate"]][i]
+    x[["overdispersion_shrinkage_list"]][["ql_disp_trend"]] <- x[["overdispersion_shrinkage_list"]][["ql_disp_trend"]][i]
+    x[["overdispersion_shrinkage_list"]][["ql_disp_shrunken"]] <- x[["overdispersion_shrinkage_list"]][["ql_disp_shrunken"]][i]
+    x[["deviances"]] <- x[["deviances"]][i]
+
+    if (!is.vector(x[["Offset"]])) {
+      x[["Offset"]] <- x[["Offset"]][i, , drop = FALSE]
+    }
+
+    if (is.function(x[["Mu"]])) {
+      .fn <- mk_delayed_mu(x[["Beta"]], x[["model_matrix"]], x[["Offset"]])
+      .rn <- rownames(x[["data"]])
+      .cn <- colnames(x[["data"]])
+      x[["Mu"]] <- function(...) {
+        o <- .fn(...)
+        rownames(o) <- .rn
+        colnames(o) <- .cn
+        o
+      }
+    } else {
+      x[["Mu"]] <- x[["Mu"]][i, , drop = FALSE]
+    }
+  }
+
+  x
+}
