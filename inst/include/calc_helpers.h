@@ -8,7 +8,6 @@ const double SQRT_DBL_EPS = std::sqrt(DBL_EPSILON);
 #include <Eigen/Dense>
 template <class D> using EMB = Eigen::MatrixBase<D>;
 
-
 template <class D4, class D1, class D2, class D3>
 inline D4 calculate_mu_mult(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat, const EMB<D3> &exp_off) {
   return ((model_matrix * beta_hat).array().exp() * exp_off.array()).unaryExpr([](double exp_x) {
@@ -24,8 +23,8 @@ inline D4 calculate_mu_add(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat,
 
 #include <Rmath.h>
 
-inline double dnbinom_impl(const double y, const double beta, const double off, const double theta) {
-  return dnbinom_mu(y, 1.0 / theta, std::exp(beta + off), true);
+inline double dnbinom_impl(const double y, const double beta_hat, const double off, const double theta) {
+  return dnbinom_mu(y, 1.0 / theta, std::exp(beta_hat + off), true);
 }
 inline double lgamma_impl(const double x) { return lgammafn(x); } // we do not use std::lgamma because it is explicitly NOT thread safe
 inline double digamma_impl(const double x) { return digamma(x); }

@@ -246,7 +246,7 @@ inline void fitBeta_FS_internal_step(
 }
 
 template <class D1, class D2> inline double fitBeta_NR_optim_step(const EMB<D1> &counts, const EMB<D2> &off, const double theta) {
-  return optimize_fmax([&counts = std::as_const(counts), &off = std::as_const(off), &theta = std::as_const(theta)](double beta) -> double {
+  return optimize_fmax([&counts = std::as_const(counts), &off = std::as_const(off), &theta = std::as_const(theta)](double beta_hat) -> double {
     double out = 0.0;
     // iterate through counts & offset simultaneously
     auto counts_begin = counts.cbegin();
@@ -254,7 +254,7 @@ template <class D1, class D2> inline double fitBeta_NR_optim_step(const EMB<D1> 
     const auto counts_end = counts.cend();
     // we known that counts and off are of the same size, so we only check one vector
     for (; counts_begin != counts_end; ++counts_begin, ++off_begin) {
-      out += dnbinom_impl(*counts_begin, beta, *off_begin, theta);
+      out += dnbinom_impl(*counts_begin, beta_hat, *off_begin, theta);
     }
     return out;
   });
@@ -269,8 +269,8 @@ inline void fitBeta_NR_internal_step(
     // other params
     const double theta, const double tolerance, const int max_iter) {
 
-  double beta = beta_out;
-  if (std::isnan(beta) || std::isnan(theta)) {
+  double beta_hat = beta_out;
+  if (std::isnan(beta_hat) || std::isnan(theta)) {
     beta_out = NAN;
     dev_out = NAN;
     iters_out = 0;
@@ -287,25 +287,25 @@ inline void fitBeta_NR_internal_step(
   int iter = 0;
   for (; iter < max_iter; iter++) {
 
-    const ArrayXd mu = (off.array() + beta).exp();
+    const ArrayXd mu = (off.array() + beta_hat).exp();
     const ArrayXd denom = 1.0 + (mu * theta).array();
 
     const double dl = ((counts.array() - mu) / denom).sum();
     const double ddl = (mu * (1.0 + counts.array() * theta) / denom / denom).sum();
 
     const double step = dl / ddl;
-    beta += step;
-    if ((std::abs(step) < tolerance) || (std::isnan(beta))) {
+    beta_hat += step;
+    if ((std::abs(step) < tolerance) || (std::isnan(beta_hat))) {
       break;
     }
   }
 
-  if (iter == max_iter || std::isnan(beta)) {
-    beta = fitBeta_NR_optim_step(counts, off, theta);
+  if (iter == max_iter || std::isnan(beta_hat)) {
+    beta_hat = fitBeta_NR_optim_step(counts, off, theta);
   }
 
-  beta_out = beta;
-  dev_out = compute_gp_deviance_sum(counts, (off.array() + beta).exp().matrix(), theta);
+  beta_out = beta_hat;
+  dev_out = compute_gp_deviance_sum(counts, (off.array() + beta_hat).exp().matrix(), theta);
   iters_out = iter;
 }
 
