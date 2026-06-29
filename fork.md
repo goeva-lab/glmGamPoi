@@ -43,6 +43,8 @@ internally, these changes have required relatively significant changes to packag
 - a general refactoring of the C++ internals to move R-unaware logic into header files in `inst/include`
 - threading the `perf_optim` relevant variable(s) throughout package internals as necessary
 - adding control flow to deal with alternate representations of Mu (prediction) and offset matrices
+- adds [LBFGSpp](https://github.com/yixuan/LBFGSpp/) as a git submodule (kept in [`inst/include/LBFGSpp`](./inst/include/LBFGSpp/)), to allow for from-C++ fitting of model betas when fisher scoring based routine fails
+- vendors an adapted version of the `Brent_fmin` routine from the R source code (kept in [`inst/include/opt_max.h`](./inst/include/opt_max.h)), to allow for from-C++ fitting of model beta when newton-raphson based routine fails
 
 > [!NOTE]
 > the latter two points non trivially increase (cyclomatic) complexity in the package (e.g. `is.vector(offset_matrix)`/`is.function(Mu)` checks in various function preludes, the branches in `overdispersion_mle`, etc.), worsening readability/parsability
