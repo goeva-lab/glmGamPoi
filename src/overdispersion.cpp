@@ -56,7 +56,7 @@ double conventional_deriv_score_function_fast(const NumericVector y, const Eigen
 }
 // [[Rcpp::export]]
 List NR_overdispersion_mle(const NumericVector y, const Eigen::Map<Eigen::VectorXd> &mean_vector, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
-                           const bool do_cox_reid_adjustment, const int max_iter = 1000, const double tolerance = 1e-8) {
+                           const bool do_cox_reid_adjustment, const int max_iter, const double tolerance = 1e-8) {
   const Map<const VectorXd> y_v(y.begin(), y.size());
 
   double est = NAN;
