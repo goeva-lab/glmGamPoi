@@ -18,18 +18,15 @@ parameters for this option include:
 
 - `offset_as_vec`: storing the offsets as a vector in the case where offsets are set uniquely in a per-cell manner (which is true for the overwhelming majority of use-cases).
   
-  > [!IMPORTANT]
-  > this leads to a **_breaking_** change in output format, as the result's `Offset` field is no longer a matrix of shape `(nrow(Y), ncol(Y))` but instead a vector of length `ncol(Y)`.
+  important: this leads to a **_breaking_** change in output format, as the result's `Offset` field is no longer a matrix of shape `(nrow(Y), ncol(Y))` but instead a vector of length `ncol(Y)`.
 
 - `delay_mu`: never explicitly form the Mu (prediction) matrix, instead returning a function which can return slices of the matrix as necessary
 
-  > [!IMPORTANT]
-  > this leads to a **_breaking_** change in output format, as the result's `Mu` field is no longer a matrix of shape `(nrow(Y), ncol(Y))` but instead a function which returns this matrix (or slice thereof) when called.
+  important: this leads to a **_breaking_** change in output format, as the result's `Mu` field is no longer a matrix of shape `(nrow(Y), ncol(Y))` but instead a function which returns this matrix (or slice thereof) when called.
 
 - `use_nr_overdisp_impl`: utilize an alternative implementation for overdispersion estimation, which is written in C++ and is thread safe, allowing for parallelization of this step
 
-  > [!NOTE]
-  > due to being specificially aware of the possibility between inconsistencies between the objective and analytic gradient functions for overdispersion estimation, it often succeeds in finding cox-reid adjusted estimations of theta which the original implementation fails to find, leading to non-insignificant changes in output values (including resulting model betas) when the cox-reid adjustment is enabled.
+  note: due to being specificially aware of the possibility between inconsistencies between the objective and analytic gradient functions for overdispersion estimation, it often succeeds in finding cox-reid adjusted estimations of theta which the original implementation fails to find, leading to non-insignificant changes in output values (including resulting model betas) when the cox-reid adjustment is enabled.
 
 by default, none of these options are enabled, as an explicit goal is that no changes should affect user outputs after having upgraded unless explicitly desired.
 
