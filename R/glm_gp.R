@@ -297,10 +297,33 @@ glm_gp <- function(data,
   }
   if(is.function(res$Mu)){
     .old <- res$Mu
-    res$Mu <- function(obs = NULL, feat = NULL) {
-      o <- .old(obs, feat)
-      rownames(o) <- rownames(data)[feat]
-      colnames(o) <- colnames(data)[obs]
+    res$Mu <- function(i = NULL, j = NULL) {
+      if (!is.null(i)) {
+        if (!is.null(rownames(data))) {
+          i <- handle_sub_param(rownames(data), i)
+          rn <- rownames(data)[i]
+        } else {
+          i <- handle_sub_param(nrow(data), i)
+          rn <- NULL
+        }
+      } else {
+        rn <- rownames(data)
+      }
+      if (!is.null(j)) {
+        if (!is.null(colnames(data))) {
+          j <- handle_sub_param(colnames(data), j)
+          cn <- colnames(data)[i]
+        } else {
+          j <- handle_sub_param(ncol(data), j)
+          cn <- NULL
+        }
+      } else {
+        cn <- colnames(data)
+      }
+
+      o <- .old(i = i, j = j)
+      rownames(o) <- rn
+      colnames(o) <- cn
       o
     }
   }else{

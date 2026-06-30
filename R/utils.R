@@ -268,7 +268,7 @@ handle_perf_optim_parameter <- function(param) {
 
 handle_Mu_rowmeans <- function(Mu, n.rows) {
   if (is.function(Mu)) {
-    vapply(seq_len(n.rows), function(i) mean(Mu(feat = i)), numeric(1))
+    vapply(seq_len(n.rows), function(i) mean(Mu(i = i)), numeric(1))
   } else {
     DelayedMatrixStats::rowMeans2(Mu)
   }
