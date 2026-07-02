@@ -246,7 +246,7 @@ inline void fitBeta_FS_internal_step(
     }
   }
 
-  if (try_recov_w_optim && iter == max_iter) {
+  if (try_recov_w_optim && (iter == max_iter)) {
     beta_hat = beta_out; // re-copy since from reference since values have been overwritten
     fitBeta_FS_optim_step(beta_hat, dev_old, iter, model_matrix, counts, exp_off, conf, theta, max_iter);
   }
