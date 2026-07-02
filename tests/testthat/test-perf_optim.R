@@ -81,34 +81,28 @@ test_that("perf_optim$delay_mu doesn't change anything (global overdispersion)",
   expect_equal(res1, res2, tolerance = 1e-7)
 })
 
-test_that("perf_optim$use_nr_overdisp_impl doesn't significantly change resulting Beta values (w/ cox-reid adjustment)", {
-  skip("known issue, default overdispersion estimator often ends up falling back to version w/o cox-reid adjustment, which is not true for C++ NR-based estimator")
-
+local({
   Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
   annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- ~ group + cont1 + cont2
 
-  set.seed(1)
-  res1 <- glm_gp(Y, design = design, col_data = annot)
+  for (cr_adj in c(FALSE, TRUE)) {
+    test_that(sprintf("perf_optim$use_nr_overdisp_impl doesn't significantly change resulting Beta values (%s cox-reid adjustment)", if (cr_adj) "w/" else "w/o"), {
+      set.seed(1)
+      res1 <- glm_gp(Y, design = design, col_data = annot, do_cox_reid_adjustment = FALSE)
 
-  set.seed(1)
-  res2 <- glm_gp(Y, design = design, col_data = annot, perf_optim = list(use_nr_overdisp_impl = TRUE))
+      set.seed(1)
+      res2 <- glm_gp(Y, design = design, col_data = annot, do_cox_reid_adjustment = FALSE, perf_optim = list(use_nr_overdisp_impl = TRUE))
 
-  expect_equal(res1[["Beta"]], res2[["Beta"]], tolerance = 1e-8)
-})
+      logliks <- function(res) vapply(seq_len(nrow(Y)), function(i) conventional_loglikelihood_fast(Y[i, ], res[["Mu"]][i, ], log(res[["overdispersions"]][[i]]), res[["model_matrix"]], cr_adj), numeric(1))
 
-test_that("perf_optim$use_nr_overdisp_impl doesn't significantly change resulting Beta values (w/o cox-reid adjustment)", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- ~ group + cont1 + cont2
+      # assert new estimation method yields about as good or better estimates of overdispersion (w/ a tolerance of 1e-9 towards worsening)
+      expect_all_true(logliks(res1) <= (logliks(res2) + 1e-8))
 
-  set.seed(1)
-  res1 <- glm_gp(Y, design = design, col_data = annot, do_cox_reid_adjustment = FALSE)
-
-  set.seed(1)
-  res2 <- glm_gp(Y, design = design, col_data = annot, do_cox_reid_adjustment = FALSE, perf_optim = list(use_nr_overdisp_impl = TRUE))
-
-  expect_equal(res1[["Beta"]], res2[["Beta"]], tolerance = 1e-8)
+      skip_if(cr_adj, "known issue, default overdispersion estimator often ends up falling back to version w/o cox-reid adjustment, which is not true for C++ NR-based estimator")
+      expect_equal(res1[["Beta"]], res2[["Beta"]], tolerance = 1e-8)
+    })
+  }
 })
 
 local({
@@ -154,9 +148,8 @@ for (fn in c("predict", "residuals")) {
 
     for (pred.type in as.list(eval(formals(fn.type)[["type"]]))) {
       test_that(sprintf("%s w/ type=%s (feat|obs).sub arguments works", fn, pred.type), {
-        if (pred.type == "randomized_quantile") {
-          skip("subsetting w/ randomized_quantile residual type is unsupported")
-        }
+        skip_if(pred.type == "randomized_quantile", "subsetting w/ randomized_quantile residual type is unsupported")
+
         fn.w <- function(...) fn.type(..., type = pred.type)
         ref <- fn.w(res)
 
