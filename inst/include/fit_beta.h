@@ -168,19 +168,30 @@ inline void fitBeta_FS_optim_step(
     const double theta, const int max_iter) {
   LBFGSpp::LBFGSParam params;
   params.max_iterations = max_iter;
+  
   // using delta-based stopping condition instead of gradient value
   params.epsilon = 0;
   params.epsilon_rel = 0;
   params.past = 1;
   params.delta = 1e-12;
-  // NocedalWright linesearch fails to find value, using MoreThuente instead
-  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchMoreThuente> solver(params);
 
-  // default used by the Eigen::NumericalDiff module
+  params.max_step = 32.; 
+
+  // nocedal-wright linesearch often fails to find a sufficiently decreasing value, using a different one instead
+  // moreover, we don't want to enforce the wolfe condition here given potential instability
+  // of our numerically approximated derivative, and nocedal-wright is only compatible w/ the wolfe condition
+  // as such, we enforce only the armijo (sufficient decrease) condition, use a plain bracketing line search, and 
+  // set a very generous sufficient decrease line search tolerance
+  params.linesearch = LBFGSpp::LBFGS_LINESEARCH_BACKTRACKING_ARMIJO;
+  params.max_linesearch = 1000;
+  params.ftol = 1e-8;
+  LBFGSpp::LBFGSSolver<double, LBFGSpp::LineSearchBracketing> solver(params);
+
+  // borrowing the default used for this by the (unstable) Eigen::NumericalDiff module
   const auto eps = SQRT_DBL_EPS;
   const BetaOptim f(conf, model_matrix, counts, exp_off, theta, eps);
-  double fx;
 
+  double fx;
   iters_out = solver.minimize(f, beta_out, fx);
 
   if (iters_out == max_iter) {
@@ -276,7 +287,7 @@ inline void fitBeta_NR_internal_step(
     iters_out = 0;
     return;
   }
-  if (counts.isApproxToConstant(0.0)) {
+  if (counts.isZero()) {
     beta_out = -INFINITY;
     dev_out = 0;
     iters_out = 0;
@@ -291,7 +302,7 @@ inline void fitBeta_NR_internal_step(
     const ArrayXd denom = 1.0 + (mu * theta).array();
 
     const double dl = ((counts.array() - mu) / denom).sum();
-    const double ddl = (mu * (1.0 + counts.array() * theta) / denom / denom).sum();
+    const double ddl = (mu * (1.0 + (counts.array() * theta)) / denom / denom).sum();
 
     const double step = dl / ddl;
     beta_hat += step;
@@ -300,7 +311,7 @@ inline void fitBeta_NR_internal_step(
     }
   }
 
-  if (iter == max_iter || std::isnan(beta_hat)) {
+  if ((iter == max_iter) || std::isnan(beta_hat)) {
     beta_hat = fitBeta_NR_optim_step(counts, off, theta);
   }
 
