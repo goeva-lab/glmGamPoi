@@ -24,7 +24,7 @@ inline D4 calculate_mu_add(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat,
 #include <Rmath.h>
 
 inline double dnbinom_impl(const double y, const double beta_hat, const double off, const double theta) {
-  return dnbinom_mu(y, 1.0 / theta, std::exp(beta_hat + off), true);
+  return dnbinom_mu(y, 1.0 / theta, std::exp(beta_hat + off), 1);
 }
 inline double lgamma_impl(const double x) { return lgammafn(x); } // we do not use std::lgamma because it is explicitly NOT thread safe
 inline double digamma_impl(const double x) { return digamma(x); }
