@@ -7,6 +7,7 @@ an explicit aim of this project has been to allow for upstream-ing of the releva
 > [!IMPORTANT]
 > to allow for easier testing / comparison against the original package to catch regressions, the package & main exported class have been renamed to `glmGamPoi2`.
 > this change is intended to be temporary and to be reverted should we merge into upstream.
+> moreover, the `R CMD CHECK` workflow for the repository has been disabled
 
 ## user-facing changes
 
@@ -37,11 +38,11 @@ internally, these changes have required relatively significant changes to packag
 - a re-write of C++ internals to utilize [Eigen](https://libeigen.gitlab.io/) (via [RcppEigen](https://cran.r-project.org/web/packages/RcppEigen/index.html)) instead of [Armadillo](https://arma.sourceforge.net/) (via [RcppArmadillo](https://cran.r-project.org/web/packages/RcppArmadillo/index.html))for algebraic/matrix operations
   - the reasoning for this is that Eigen makes stronger guarantees around thread-safety of its data structures ([c.f.](https://libeigen.gitlab.io/eigen/docs-nightly/TopicMultiThreading.html)) compared to Armadillo, which was necessary for this project given the aim to enable cross-gene parallelization of beta/overdispersion estimation steps
   - while Armadillo offers some inherent parallelization (by using OPENMP for specific operations), it appears heavily dependent on system configuration (e.g. OPENMP presence, etc.), leading to difficulties w/ consistent benchmarking, further motivating this design decision, given our interest in direct control of parallelization levels
-- a general refactoring of the C++ internals to move R-unaware logic into header files in `inst/include`
+- a general refactoring of the C++ internals to move R-unaware logic into header files in [`inst/include`](./inst/include/)
 - threading the `perf_optim` relevant variable(s) throughout package internals as necessary
 - adding control flow to deal with alternate representations of Mu (prediction) and offset matrices
 - adds [LBFGSpp](https://github.com/yixuan/LBFGSpp/) as a git submodule (kept in [`inst/include/LBFGSpp`](./inst/include/LBFGSpp/)), to allow for from-C++ fitting of model betas when fisher scoring based routine fails
-- vendors an adapted version of the `Brent_fmin` routine from the R source code (kept in [`inst/include/opt_max.h`](./inst/include/opt_max.h)), to allow for from-C++ fitting of model beta when newton-raphson based routine fails
+- vendors an adapted version of the `Brent_fmin` routine ([c.f.](https://svn.r-project.org/R/trunk/src/library/stats/src/optimize.c)) from the R source code (kept in [`inst/include/opt_max.h`](./inst/include/opt_max.h)), to allow for from-C++ fitting of model beta when newton-raphson based routine fails
 
 > [!NOTE]
 > the latter two points non trivially increase (cyclomatic) complexity in the package (e.g. `is.vector(offset_matrix)`/`is.function(Mu)` checks in various function preludes, the branches in `overdispersion_mle`, etc.), worsening readability/parsability
@@ -49,14 +50,12 @@ internally, these changes have required relatively significant changes to packag
 a test suite for relevant changes has also been added at [`test-perf_optim.R`](./tests/testthat/test-perf_optim.R)
 
 > [!IMPORTANT]
-> switching to using the NR-based overdispersion estimator causes five (5) tests to fail which previously passed:
+> switching to using the NR-based overdispersion estimator causes four (4) tests to fail which previously passed:
 >
 > - [`test-estimate_betas.R:582:3`](./tests/testthat/test-estimate_betas.R#L582): mean relative diff of `-2.1e-05` in `deviances` (existing tolerance is `1.490116e-08`, testthat default)
 > - [`test-estimate_betas.R:583:3`](./tests/testthat/test-estimate_betas.R#L583): mean relative diff of `8.62e-07` in `overdispersions` (existing tolerance is `1.490116e-08`, testthat default)
 > - [`test-estimate_betas.R:584:3`](./tests/testthat/test-estimate_betas.R#L584): mean relative diff of `2.850992e-07` in `dispersion_trend` (existing tolerance is `1.490116e-08`, testthat default)
 > - [`test-test_de.R:24:3`](./tests/testthat/test-test_de.R#L24): mean relative diff of `0.1576794` (existing tolerance is `0.1`)
-> - [`test-overdispersion.R:149:3`](./tests/testthat/test-overdispersion.R#L149): the NR-based estimation finds an answer within the bounds of `[1e-16, 1e16]`, but larger than `1e8` (which is the bound on the test).
->   on the other hand, the existing routine fails w/ the cox-reid adjustment and falls back to not using it and returning a smaller estimate.
 
 ## miscleanea
 
