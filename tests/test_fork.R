@@ -1,0 +1,330 @@
+# jarl-ignore-file if_always_true:>
+# jarl-ignore-file unreachable_code:>
+# jarl-ignore-file internal_function:>
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(patchwork)
+  library(data.table)
+})
+
+# incredibly hacky way to source header files w/ generics
+sourceH <- function(pth, monomorph = list(), export.all = TRUE, ...) {
+  patch.list <- list(
+    "#include <RcppEigen.h>" = "// [[Rcpp::depends(RcppEigen)]]",
+    "#include <RcppArmadillo.h>" = "// [[Rcpp::depends(RcppArmadillo)]]"
+  )
+
+  lines <- purrr::reduce2(
+    names(monomorph),
+    monomorph,
+    function(lines, trg, dst) {
+      is_export <- export.all
+      swp <- FALSE
+      templ_pat <- stringr::regex(sprintf("(template ?<.*)( *class %s *,? *)(.*>)", trg))
+
+      stringr::str_subset(
+        purrr::map(lines, function(l) {
+          if (stringr::str_detect(l, stringr::fixed("// [[Rcpp::export]]"))) {
+            is_export <<- TRUE
+            return(l)
+          }
+          if (is_export && stringr::str_detect(l, templ_pat)) {
+            swp <<- TRUE
+            return(stringr::str_replace(l, templ_pat, "\\1\\3"))
+          }
+          if (swp) {
+            return(stringr::str_replace_all(l, stringr::fixed(trg), dst))
+          }
+
+          if (swp && (l == "}")) {
+            is_export <<- export.all
+            swp <<- FALSE
+          }
+          l
+        }),
+        stringr::regex("template ?<>"),
+        negate = TRUE
+      )
+    },
+    .init = readLines(pth)
+  ) |>
+    purrr::map(function(l) {
+      # patch in header dependency comments
+      for (inc in names(patch.list)) {
+        if (stringr::str_detect(l, stringr::fixed(inc))) {
+          return(paste0(c(patch.list[[inc]], l), collapse = "\n"))
+        }
+      }
+      # incredibly hack way to find function declarations
+      if (export.all && stringr::str_starts(l, stringr::regex("[^ ]+ [^ ]+\\("))) {
+        return(paste0(c("// [[Rcpp::export]]", l), collapse = "\n"))
+      }
+      l
+    })
+  env <- new.env()
+  Rcpp::sourceCpp(code = paste0(lines, collapse = "\n"), env = env, ...)
+
+  env
+}
+
+obj.pl <- function(res, i, min_x = -10, max_x = 10, n = 1000, fn.ns = "glmGamPoi", cr.adj = TRUE) {
+  obj.fn <- getFromNamespace("conventional_loglikelihood_fast", fn.ns)
+  drv.fn <- getFromNamespace("conventional_score_function_fast", fn.ns)
+  hess.fn <- getFromNamespace("conventional_deriv_score_function_fast", fn.ns)
+  inp.range <- rev(seq(min_x, max_x, (max_x - min_x) / n))
+  mu <- if (is.function(res[["Mu"]])) res[["Mu"]](i = i) else res[["Mu"]][i, ]
+  y <- SummarizedExperiment::assay(res[["data"]])[i, ]
+
+  df <- rbindlist(
+    purrr::map(list("objective" = obj.fn, "derivative" = drv.fn, "hessian" = hess.fn), function(f) {
+      data.table(
+        x = inp.range,
+        value = vapply(inp.range, function(e) f(y, mu, e, res[["model_matrix"]], cr.adj), numeric(1))
+      )
+    }),
+    idcol = "fn"
+  )
+  max.obj <- df[fn == "objective"][which.max(value)]
+  ggplot(df) +
+    aes(x = x, y = value, colour = forcats::fct_inorder(fn)) +
+    geom_point(shape = ".") +
+    geom_vline(
+      inherit.aes = TRUE,
+      data = rbind(
+        max.obj,
+        df[(fn == "derivative") & between(x, max.obj[, x] - 10, max.obj[, x] + 10)][which.min(abs(value))]
+      ),
+      aes(xintercept = x)
+    ) +
+    facet_grid(rows = vars(forcats::fct_inorder(fn)), scales = "free_y") +
+    guides(linetype = "none", colour = "none", shape = "none")
+}
+
+
+diff.dt <- function(ref, new, drop.na = FALSE) {
+  DT <- melt(
+    cbind(
+      as.data.table(ref[["Beta"]], "rn"),
+      overdispersion = ref[["overdispersions"]],
+      deviance = ref[["deviances"]]
+    ),
+    value.name = "value.glmGamPoi",
+    id.vars = "rn"
+  )[
+    melt(
+      cbind(
+        as.data.table(new[["Beta"]], "rn"),
+        overdispersion = new[["overdispersions"]],
+        deviance = new[["deviances"]]
+      ),
+      id.vars = "rn",
+      value.name = "value.glmGamPoi2"
+    ),
+    on = .(rn, variable)
+  ]
+
+  if (drop.na) {
+    DT <- na.omit(DT)
+  }
+
+  split(DT, by = "variable", keep.by = FALSE)
+}
+
+sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 / nrow(mm), seq_len(ncol(mm) - 1))) {
+  Y <- SummarizedExperiment::assay(sce)
+  col_data <- SummarizedExperiment::colData(sce)
+
+  off <- glmGamPoi:::combine_size_factors_and_offset(0, "normed_sum", Y)[["offset_matrix"]]
+  mm <- glmGamPoi:::handle_design_parameter(design, Y, col_data, NULL)[["model_matrix"]]
+  betas <- glmGamPoi:::estimate_betas_roughly(Y, mm, off)
+  disps <- glmGamPoi:::estimate_dispersions_roughly(Y, mm, off)
+  ridge <- glmGamPoi:::handle_ridge_penalty_parameter(if (is.function(ridge_vec)) ridge_vec(mm) else ridge_vec, mm)
+  disc.cols <- which(vapply(seq_len(ncol(mm)), function(j) length(unique(mm[, j])) < nrow(mm), logical(1)))
+
+  ridge_t <- attr(ridge, "target")
+  ridge <- diag(ridge, nrow = length(ridge))
+  attr(ridge, "target") <- ridge_t
+
+  mu <- exp(Matrix::tcrossprod(betas, mm) + off)
+
+  fns <- list(
+    compute_gp_deviance_residuals_matrix = function() compute_gp_deviance_residuals_matrix(as.matrix(Y), mu, disps),
+    fitBeta_fisher_scoring = function() fitBeta_fisher_scoring(beachmat::initializeCpp(Y), mm, beachmat::initializeCpp(exp(off)), disps, betas, NULL, 1e-8, 1e5, 1000),
+    fitBeta_fisher_scoring_ridge = function() fitBeta_fisher_scoring(beachmat::initializeCpp(Y), mm, beachmat::initializeCpp(exp(off)), disps, betas, ridge, 1e-8, 1e5, 1000),
+    fitBeta_fisher_scoring_diagonal = function() fitBeta_diagonal_fisher_scoring(beachmat::initializeCpp(Y), mm, beachmat::initializeCpp(exp(off)), disps, betas, 1e-8, 1e5, 1000),
+    estimate_betas_fisher_scoring = function() estimate_betas_fisher_scoring(Y, mm, off, disps, betas, NULL),
+    estimate_betas_fisher_scoring_ridge = function() estimate_betas_fisher_scoring(Y, mm, off, disps, betas, ridge),
+    estimate_betas_optim = function() estimate_betas_optim(Y, mm, off, disps, betas, NULL),
+    estimate_betas_optim_ridge = function() estimate_betas_optim(Y, mm, off, disps, betas, ridge),
+    overdispersion_mle = function() overdispersion_mle(Y, mu, mm, FALSE, FALSE),
+    overdispersion_mle_wcr = function() overdispersion_mle(Y, mu, mm, TRUE, FALSE),
+    overdispersion_mle_global = function() overdispersion_mle(Y, mu, mm, FALSE, TRUE),
+    overdispersion_mle_global_wcr = function() overdispersion_mle(Y, mu, mm, TRUE, TRUE),
+    overdispersion_mle_nr = function() {
+      (if ("use_nr_overdisp_impl" %in% names(formals(overdispersion_mle))) {
+        function(...) overdispersion_mle(..., use_nr_overdisp_impl = TRUE)
+      } else {
+        overdispersion_mle
+      })(Y, mu, mm, FALSE, FALSE)[["estimate"]]
+    },
+    overdispersion_mle_nr_wcr = function() {
+      (if ("use_nr_overdisp_impl" %in% names(formals(overdispersion_mle))) {
+        function(...) overdispersion_mle(..., use_nr_overdisp_impl = TRUE)
+      } else {
+        overdispersion_mle
+      })(Y, mu, mm, TRUE, FALSE)[["estimate"]]
+    }
+  )
+
+  # if we have columns w/ discrete values that can be split into groups
+  # also run diff for estimate_betas_group_wise
+  grps <- glmGamPoi:::get_groups_for_model_matrix(mm[, disc.cols, drop = FALSE])
+  if (!is.null(grps)) {
+    fns <- append(
+      fns,
+      list(
+        estimate_betas_group_wise = function() {
+          estimate_betas_group_wise(
+            Y,
+            off,
+            disps,
+            beta_mat_init = betas[, disc.cols, drop = FALSE],
+            groups = grps,
+            model_matrix = mm[, disc.cols, drop = FALSE]
+          )
+        }
+      )
+    )
+  } else {
+    warning("diff for estimate_betas_group_wise not run because no component of model matrix can be split into discrete groups")
+  }
+
+  i.fns <- purrr::list_flatten(list(
+    purrr::list_flatten(purrr::map(setNames(nm = c("conventional_loglikelihood_fast", "conventional_score_function_fast", "conventional_deriv_score_function_fast")), function(fn) {
+      purrr::map(c("with_cr" = TRUE, "w/o_cr" = FALSE), function(cr.adj) function(i) get(fn)(Y[i, ], mu[i, ], log(disps[[i]]), mm, cr.adj))
+    })),
+    purrr::imap(
+      list(
+        "fisher_scoring_qr_step" = function(i) list(),
+        "fisher_scoring_qr_ridge_step" = function(i) list(ridge, ridge_t, betas[i, ]),
+        "fisher_scoring_diagonal_step" = function(i) list()
+      ),
+      function(extra.args, fn) {
+        function(i) do.call(get(fn), append(list(mm, Y[i, ], c(mu[i, ]), c(mu[i, ] * disps[[i]])), extra.args(i)))
+      }
+    ),
+    list(compute_gp_deviance_sum = function(i) compute_gp_deviance_sum(Y[i, ], mu[i, ], disps[[i]]))
+  ))
+
+  cmp.fn <- function(fn, nm) {
+    if (!missing(nm)) {
+      message(sprintf("running test for - %s\n", nm))
+    }
+    fn.ref <- fn.w.env(fn, glmGamPoi.env)
+    fn.new <- fn.w.env(fn, glmGamPoi2.env)
+    if ((length(formals(fn)) != 0)) {
+      fn.ref.o <- fn.ref
+      fn.new.o <- fn.new
+      fn.ref <- function() purrr::map(seq_len(nrow(Y)), function(i) fn.ref.o(i))
+      fn.new <- function() purrr::map(seq_len(nrow(Y)), function(i) fn.new.o(i))
+    }
+    perf <- bench::mark(
+      ref = {
+        ref <- fn.ref()
+      },
+      new = {
+        new <- fn.new()
+      },
+      check = FALSE,
+      iterations = 1,
+      filter_gc = FALSE
+    )
+
+    out <- waldo::compare(ref, new, tolerance = tol)
+    attr(out, "ref") <- ref
+    attr(out, "new") <- new
+    attr(out, "bench") <- perf
+
+    out
+  }
+
+  purrr::compact(append(
+    # per gene functions
+    purrr::imap(i.fns, cmp.fn),
+    # whole data functions
+    purrr::imap(fns, cmp.fn)
+  ))
+}
+
+stack.envs <- function(x, y) as.environment(append(as.list(x), as.list(y)))
+
+fn.w.env <- function(fn, env) {
+  env.c <- list2env(as.list(environment(fn)), parent = parent.env(environment(fn)))
+  purrr::iwalk(as.list(env), function(x, nm) assign(nm, x, env.c))
+  environment(fn) <- env.c
+
+  fn
+}
+
+load.fork <- function() {
+  withr::with_makevars(
+    assignment = "=",
+    c(
+      # using clang instead of gcc because error messages during compilation are more readable
+      CXX17 = "clang++ -fuse-ld=lld -flto -ffat-lto-objects -fopenmp",
+      CXX17STD = "-std=c++17",
+      CXX17FLAGS = "-O3 -march=native",
+      LDFLAGS = "-L/usr/lib64/R/lib -Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs"
+    ),
+    {
+      pkgbuild::clean_dll()
+      pkgload::load_all(quiet = TRUE, debug = FALSE, attach = FALSE, compile = TRUE)
+    }
+  )
+}
+
+load.fork()
+glmGamPoi.env <- stack.envs(
+  getNamespace("glmGamPoi"),
+  # original package does not provide the fisher scoring step methods, so we compile/export them manually
+  sourceH("https://raw.githubusercontent.com/const-ae/glmGamPoi/refs/heads/devel/inst/include/fisher_scoring_steps.h", list(NumericType = "double"))
+)
+glmGamPoi2.env <- getNamespace("glmGamPoi2")
+
+PERF_OPTIM_CONF <- list(delay_mu = TRUE, offset_as_vec = TRUE, use_nr_overdisp_impl = TRUE)
+
+
+if (TRUE) {
+  sce <- muscData::Kang18_8vs8()
+  sce <- sce[rowSums(counts(sce)) > 5, !is.na(sce$cell)]
+  sce <- glmGamPoi2::pseudobulk(sce, group_by = vars(ind, stim, cell_type = cell))
+
+  design <- ~ stim * cell_type + ind
+  out <- bench::mark(
+    glmGamPoi = {
+      ref <- glmGamPoi::glm_gp(sce, design)
+    },
+    glmGamPoi2 = {
+      new <- glmGamPoi2::glm_gp(
+        sce,
+        design,
+        perf_optim = append(
+          PERF_OPTIM_CONF,
+          list(do_parallel = parallel::detectCores())
+        )
+      )
+    },
+    filter_gc = FALSE,
+    check = FALSE,
+    iterations = 1
+  )
+  mod.vals <- diff.dt(ref, new)
+
+  mod.vals.pl <- mod.vals[c("stimstim", "deviance", "overdispersion")] |>
+    rbindlist(idcol = "variable") |>
+    ggplot() +
+    aes(x = value.glmGamPoi - value.glmGamPoi2) +
+    geom_density(fill = "grey") +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "red", alpha = 0.5) +
+    facet_wrap(vars(variable), scales = "free")
+}

@@ -47,7 +47,10 @@ internally, these changes have required relatively significant changes to packag
 > [!NOTE]
 > the latter two points non trivially increase (cyclomatic) complexity in the package (e.g. `is.vector(offset_matrix)`/`is.function(Mu)` checks in various function preludes, the branches in `overdispersion_mle`, etc.), worsening readability/parsability
 
-a test suite for relevant changes has also been added at [`test-perf_optim.R`](./tests/testthat/test-perf_optim.R)
+a test suite for relevant changes has also been added at [`test-perf_optim.R`](./tests/testthat/test-perf_optim.R).
+
+moreover, a file to drive benchmarking / regression analysis is provided at [`test_fork.R`](./tests/test_fork.R).
+it will most likely be deleted and maybe moved to a separate repo prior to upstreaming.
 
 > [!IMPORTANT]
 > switching to using the NR-based overdispersion estimator causes four (4) tests to fail which previously passed:
