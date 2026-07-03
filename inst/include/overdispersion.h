@@ -57,12 +57,15 @@ inline double conventional_loglikelihood_fast_impl(const EMB<D1> &y, const EMB<D
     // cr_term = -0.5 * log(det(b)) * cr_correction_factor;
 
     // compute det(B) using LU decomposition
-    double ld = 0; // det(L) is lower unit triangular, thus det(L) = 1 => log(det(L)) = 0;
-    Eigen::PartialPivLU lu = b.partialPivLu();
-    for (double e : lu.matrixLU().diagonal()) {
-      ld += e < 1e-50 ? std::log(1e-50) : std::log(e);
-    }
-    cr_term = -0.5 * ld * cr_correction_factor;
+
+    // eigen computes LU decomposition w/ a _unit_ lower triangular L and upper triangular U,
+    // representing the resulting L/U matrices in a single square matrix (returned by the matrixLU method)
+    // e.g. leaving the diagonal of L represented implicitly (since it is known to be unit values)
+    //
+    // as such, when computing the determinant ( det(X) = prod(diag(L)) * prod(diag(U)) )
+    // we ignore the diagonal of L given that it has unit values, and use the diagonal of matrixLU (which is in turn the diagonal of U)
+    // moreover, we clamp at 1e-50 to avoid generating infinities in the final sum
+    cr_term = -0.5 * b.partialPivLu().matrixLU().diagonal().cwiseAbs().cwiseMax(1e-50).array().log().sum() * cr_correction_factor;
   }
 
   const double theta_neg1 = 1.0 / theta;
@@ -261,7 +264,7 @@ inline double clamp_logspace(const double a, // base value,
   return std::min(s, std::log1p(t * std::exp(-a)));
 }
 
-template <class D1, class D2, class D3, class D4, class D5>
+template <bool NUM_ADJ = true, class D1, class D2, class D3, class D4, class D5>
 inline void estimate_theta(double &log_theta_out, int &iters_out, const EMB<D1> &y, const EMB<D2> &mean_vector, const EMB<D3> &model_matrix,
                            const bool do_cox_reid_adjustment, const double tol, const double eps, const EMB<D4> &unique_counts,
                            const EMB<D5> &count_frequencies) {
@@ -273,8 +276,9 @@ inline void estimate_theta(double &log_theta_out, int &iters_out, const EMB<D1> 
         conventional_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
     const auto abs_hess = std::abs(conventional_deriv_score_function_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment,
                                                                                unique_counts, count_frequencies));
-
-    const auto step = std::clamp(clamp_logspace(log_theta_out, grad / abs_hess, 32.), -16., 16.);
+    
+    // we clamp outside of log-space to avoid issues w/ huge values
+    const auto step = std::clamp(clamp_logspace(log_theta_out, grad / abs_hess, 64.), -16., 16.);
 
     log_theta_out += step;
 
@@ -288,49 +292,56 @@ inline void estimate_theta(double &log_theta_out, int &iters_out, const EMB<D1> 
 
   // analytical derivative zero sometimes disagrees w/ optimum of objective (in the cox-reid adjustment case especially)
   // as such, we proceed w/ a numerical gradient ascent based adjustment of our newton-raphson result
+  if constexpr (NUM_ADJ) {
+    auto suff_inc = eps / 128.;
+    for (; iters_out < max_iter; iters_out++) {
+      const auto step_bwd = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out - eps, model_matrix, do_cox_reid_adjustment,
+                                                                 unique_counts, count_frequencies);
+      const auto step_fwd = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out + eps, model_matrix, do_cox_reid_adjustment,
+                                                                 unique_counts, count_frequencies);
 
-  for (; iters_out < max_iter; iters_out++) {
-    const auto cur_val =
-        conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies);
-    const auto step_bwd = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out - eps, model_matrix, do_cox_reid_adjustment,
-                                                               unique_counts, count_frequencies);
-    const auto step_fwd = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out + eps, model_matrix, do_cox_reid_adjustment,
-                                                               unique_counts, count_frequencies);
+      // addition to insure sufficient increase (otherwise some steps can be ill-behaved)
+      // using minimum of re-projected to linear space increase and log-space value
+      const auto cur_val_p_eps = conventional_loglikelihood_fast_impl(y, mean_vector, log_theta_out, model_matrix, do_cox_reid_adjustment,
+                                                                      unique_counts, count_frequencies) +
+                                 std::min(suff_inc, std::log1p(suff_inc * std::exp(-log_theta_out)));
 
-    double step;
-    if (step_bwd > cur_val) {
-      step = -1.;
-    } else if (step_fwd > cur_val) {
-      step = 1.;
-    } else {
-      // if steps in either direction do not yield an increase, then we bail on this procedure
-      break;
-    }
-    // stricter clamp on step size given that we're supposed to be doing a refinement
-    // no need to additionally clamp outside of log-space given that we set the initial step size to ±1
-    step = clamp_logspace(log_theta_out, step, 8.);
-
-    // find step in ascent direction that _actually_ increases the objective
-    auto cand = log_theta_out + step;
-    while (conventional_loglikelihood_fast_impl(y, mean_vector, cand, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies) <
-           cur_val) {
-      step *= 0.5;
-
-      // we've shrunk our step size below the tolerance and still not found a
-      // value that increases the objective, so we bail w/ the existing value
-      if (step < tol) {
-        return;
+      // the analytically driven iteration tends to overshoot on the
+      double step;
+      if (step_bwd > cur_val_p_eps) {
+        step = -2.;
+      } else if (step_fwd > cur_val_p_eps) {
+        step = clamp_logspace(log_theta_out, 2., 8.);
+      } else {
+        // if steps in either direction do not yield a sufficient increase, then we bail on this procedure
+        break;
       }
 
-      cand = log_theta_out + step;
-    }
-    log_theta_out = cand;
+      // find step in ascent direction that _actually_ increases the objective
+      auto cand = log_theta_out + step;
+      while (conventional_loglikelihood_fast_impl(y, mean_vector, cand, model_matrix, do_cox_reid_adjustment, unique_counts, count_frequencies) <
+             cur_val_p_eps) {
+        step *= 0.5;
 
-    if (std::isnan(log_theta_out)) {
-      return;
-    }
-    if (std::abs(step) < tol) {
-      break;
+        // we've shrunk our step size below the epsilon value and still not found a
+        // value that increases the objective, which should never happen given that
+        // we know that for estimate +/- eps, we saw an increase
+        // this would indicate that the objective function is very ill-behaved around our estimate, so we bail
+        if (std::abs(step) < eps) {
+          log_theta_out = NAN;
+          return;
+        }
+
+        cand = log_theta_out + step;
+      }
+      log_theta_out = cand;
+
+      if (std::isnan(log_theta_out)) {
+        return;
+      }
+      if (std::abs(step) < tol) {
+        break;
+      }
     }
   }
 }
@@ -372,17 +383,16 @@ inline void overdispersion_mle_NR_impl(double &est_out, int &iters_out, std::str
   // initial value of iters_out is used by estimate_theta to signal max iters count
   iters_out = max_iter;
 
-  estimate_theta(log_theta_out, iters_out, y, mean_vec_clamp, model_matrix, do_cox_reid_adjustment, tol, SQRT_DBL_EPS, unique_counts,
+  estimate_theta<true>(log_theta_out, iters_out, y, mean_vec_clamp, model_matrix, do_cox_reid_adjustment, tol, SQRT_DBL_EPS, unique_counts,
                  count_frequencies);
 
   // if failed and cox-reid adjustment is used: try w/o cox-reid adjustment
   if (do_cox_reid_adjustment && (std::isnan(log_theta_out) || (iters_out == max_iter))) {
     msg_out = "Estimated overdispersion w/o cox-reid adjustment";
     log_theta_out = log_theta_init;
-    // increase the lenience on the max iteration count
-    iters_out = max_iter * 2.;
+    iters_out = max_iter;
 
-    estimate_theta(log_theta_out, iters_out, y, mean_vec_clamp, model_matrix, false, tol, SQRT_DBL_EPS, unique_counts, count_frequencies);
+    estimate_theta<false>(log_theta_out, iters_out, y, mean_vec_clamp, model_matrix, false, tol, SQRT_DBL_EPS, unique_counts, count_frequencies);
   }
 
   est_out = std::exp(log_theta_out);
