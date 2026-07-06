@@ -21,7 +21,7 @@ inline double compute_gp_deviance(const double y, const double mu, const double 
   } else {
     // Otherwise calculate Gamma-Poisson deviance
     if (y == 0) {
-      return 2.0 / theta * std::log((1 + mu * theta));
+      return 2.0 / theta * std::log1p(mu * theta);
     } else {
       const double s1 = y * std::log((mu + y * mu * theta) / (y + y * mu * theta));
       const double s2 = 1.0 / theta * std::log((1 + mu * theta) / (1 + y * theta));
