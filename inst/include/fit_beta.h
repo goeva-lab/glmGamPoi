@@ -229,7 +229,9 @@ inline void fitBeta_FS_internal_step(
   int iter = 0;
   for (; iter < max_iter; iter++) {
     // Find good direction to optimize beta
-    const VectorXd step = conf.fs_step(model_matrix, counts, mu_hat, theta * mu_hat, beta_hat);
+    // but clamp at reasonable size to avoid huge betas
+    // TODO: find out what's causing fisher steps to be on the scale of > 1e8
+    const VectorXd step = conf.fs_step(model_matrix, counts, mu_hat, theta * mu_hat, beta_hat).unaryExpr([](double e) -> double { return std::clamp(e, -1e8, 1e8); });
     // Find step size that actually decreases the deviance
     const double dev = decrease_deviance(beta_hat, mu_hat, step, model_matrix, conf, exp_off, counts, theta, dev_old, tolerance, max_rel_mu_change);
 
