@@ -39,10 +39,11 @@ internally, these changes have required relatively significant changes to packag
   - the reasoning for this is that Eigen makes stronger guarantees around thread-safety of its data structures ([c.f.](https://libeigen.gitlab.io/eigen/docs-nightly/TopicMultiThreading.html)) compared to Armadillo, which was necessary for this project given the aim to enable cross-gene parallelization of beta/overdispersion estimation steps
   - while Armadillo offers some inherent parallelization (by using OPENMP for specific operations), it appears heavily dependent on system configuration (e.g. OPENMP presence, etc.), leading to difficulties w/ consistent benchmarking, further motivating this design decision, given our interest in direct control of parallelization levels
 - a general refactoring of the C++ internals to move R-unaware logic into header files in [`inst/include`](./inst/include/)
+- sets a strict clamp of +/- 1e8 to fisher step size when fitting model betas to avoid huge values (this might be reverted, true necessity unclear)
+- adds [LBFGSpp](https://github.com/yixuan/LBFGSpp/) as a git submodule (kept in [`inst/include/LBFGSpp`](./inst/include/LBFGSpp/)), to allow for from-C++ fitting of model betas when fisher scoring based routine fails
+- vendors an adapted version of the `Brent_fmin` routine ([c.f.](https://svn.r-project.org/R/trunk/src/library/stats/src/optimize.c)) from the R source code (kept in [`inst/include/opt_max.h`](./inst/include/opt_max.h)), to allow for from-C++ fitting of model beta when the newton-raphson based routine fails
 - threading the `perf_optim` relevant variable(s) throughout package internals as necessary
 - adding control flow to deal with alternate representations of Mu (prediction) and offset matrices
-- adds [LBFGSpp](https://github.com/yixuan/LBFGSpp/) as a git submodule (kept in [`inst/include/LBFGSpp`](./inst/include/LBFGSpp/)), to allow for from-C++ fitting of model betas when fisher scoring based routine fails
-- vendors an adapted version of the `Brent_fmin` routine ([c.f.](https://svn.r-project.org/R/trunk/src/library/stats/src/optimize.c)) from the R source code (kept in [`inst/include/opt_max.h`](./inst/include/opt_max.h)), to allow for from-C++ fitting of model beta when newton-raphson based routine fails
 
 > [!NOTE]
 > the latter two points non trivially increase (cyclomatic) complexity in the package (e.g. `is.vector(offset_matrix)`/`is.function(Mu)` checks in various function preludes, the branches in `overdispersion_mle`, etc.), worsening readability/parsability
