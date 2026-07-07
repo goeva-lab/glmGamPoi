@@ -1,5 +1,3 @@
-# jarl-ignore-file if_always_true:>
-# jarl-ignore-file unreachable_code:>
 # jarl-ignore-file internal_function:>
 suppressPackageStartupMessages({
   library(ggplot2)
@@ -101,27 +99,55 @@ obj.pl <- function(res, i, min_x = -10, max_x = 10, n = 1000, fn.ns = "glmGamPoi
 }
 
 
-diff.dt <- function(ref, new, drop.na = FALSE) {
+diff.dt <- function(ref, fork, drop.na = FALSE) {
+  if (class(ref)[[1]] == "list") {
+    stopifnot(class(fork) == "list")
+    ref.de <- ref[[2]]
+    fork.de <- fork[[2]]
+    ref <- ref[[1]]
+    fork <- fork[[1]]
+  }
+
   DT <- melt(
     cbind(
-      as.data.table(ref[["Beta"]], "rn"),
+      as.data.table(ref[["Beta"]], "gene"),
       overdispersion = ref[["overdispersions"]],
       deviance = ref[["deviances"]]
     ),
     value.name = "value.glmGamPoi",
-    id.vars = "rn"
+    id.vars = "gene"
   )[
     melt(
       cbind(
-        as.data.table(new[["Beta"]], "rn"),
-        overdispersion = new[["overdispersions"]],
-        deviance = new[["deviances"]]
+        as.data.table(fork[["Beta"]], "gene"),
+        overdispersion = fork[["overdispersions"]],
+        deviance = fork[["deviances"]]
       ),
-      id.vars = "rn",
+      id.vars = "gene",
       value.name = "value.glmGamPoi2"
     ),
-    on = .(rn, variable)
+    on = .(gene, variable)
   ]
+
+  if (exists("ref.de")) {
+    DT <- rbind(
+      DT,
+      melt(
+        setnames(as.data.table(ref.de), old = "name", new = "gene"),
+        id.vars = "gene",
+        measure.vars = c("adj_pval", "f_statistic", "lfc"),
+        value.name = "value.glmGamPoi"
+      )[
+        melt(
+          setnames(as.data.table(fork.de), old = "name", new = "gene"),
+          id.vars = "gene",
+          measure.vars = c("adj_pval", "f_statistic", "lfc"),
+          value.name = "value.glmGamPoi2"
+        ),
+        on = .(gene, variable)
+      ]
+    )
+  }
 
   if (drop.na) {
     DT <- na.omit(DT)
@@ -130,7 +156,44 @@ diff.dt <- function(ref, new, drop.na = FALSE) {
   split(DT, by = "variable", keep.by = FALSE)
 }
 
-sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 / nrow(mm), seq_len(ncol(mm) - 1))) {
+stack.envs <- function(x, y) as.environment(append(as.list(x), as.list(y)))
+
+fn.w.env <- function(fn, env) {
+  env.c <- list2env(as.list(environment(fn)), parent = parent.env(environment(fn)))
+  purrr::iwalk(as.list(env), function(x, nm) assign(nm, x, env.c))
+  environment(fn) <- env.c
+
+  fn
+}
+
+load.fork <- function() {
+  withr::with_makevars(
+    assignment = "=",
+    c(
+      # using clang instead of gcc because error messages during compilation are more readable
+      CXX17 = "clang++ -fuse-ld=lld -flto -ffat-lto-objects -fopenmp",
+      CXX17STD = "-std=c++17",
+      CXX17FLAGS = "-O3 -march=native",
+      LDFLAGS = "-L/usr/lib64/R/lib -Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs"
+    ),
+    {
+      pkgbuild::clean_dll()
+      pkgload::load_all(quiet = TRUE, debug = FALSE, attach = FALSE, compile = TRUE)
+    }
+  )
+}
+load.fork()
+
+GLMGAMPOI.REF.ENV <- stack.envs(
+  getNamespace("glmGamPoi"),
+  # original package does not provide the fisher scoring step methods, so we compile/export them manually
+  sourceH("https://raw.githubusercontent.com/const-ae/glmGamPoi/refs/heads/devel/inst/include/fisher_scoring_steps.h", list(NumericType = "double"))
+)
+GLMGAMPOI.FORK.ENV <- getNamespace("glmGamPoi2")
+PERF_OPTIM_CONF <- list(delay_mu = TRUE, offset_as_vec = TRUE, use_nr_overdisp_impl = TRUE)
+
+
+sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 / nrow(mm), seq_len(ncol(mm) - 1)), ref.env = GLMGAMPOI.REF.ENV, fork.env = GLMGAMPOI.FORK.ENV) {
   Y <- SummarizedExperiment::assay(sce)
   col_data <- SummarizedExperiment::colData(sce)
 
@@ -220,8 +283,8 @@ sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 /
     if (!missing(nm)) {
       message(sprintf("running test for - %s\n", nm))
     }
-    fn.ref <- fn.w.env(fn, glmGamPoi.env)
-    fn.new <- fn.w.env(fn, glmGamPoi2.env)
+    fn.ref <- fn.w.env(fn, ref.env)
+    fn.new <- fn.w.env(fn, fork.env)
     if ((length(formals(fn)) != 0)) {
       fn.ref.o <- fn.ref
       fn.new.o <- fn.new
@@ -254,77 +317,4 @@ sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 /
     # whole data functions
     purrr::imap(fns, cmp.fn)
   ))
-}
-
-stack.envs <- function(x, y) as.environment(append(as.list(x), as.list(y)))
-
-fn.w.env <- function(fn, env) {
-  env.c <- list2env(as.list(environment(fn)), parent = parent.env(environment(fn)))
-  purrr::iwalk(as.list(env), function(x, nm) assign(nm, x, env.c))
-  environment(fn) <- env.c
-
-  fn
-}
-
-load.fork <- function() {
-  withr::with_makevars(
-    assignment = "=",
-    c(
-      # using clang instead of gcc because error messages during compilation are more readable
-      CXX17 = "clang++ -fuse-ld=lld -flto -ffat-lto-objects -fopenmp",
-      CXX17STD = "-std=c++17",
-      CXX17FLAGS = "-O3 -march=native",
-      LDFLAGS = "-L/usr/lib64/R/lib -Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs"
-    ),
-    {
-      pkgbuild::clean_dll()
-      pkgload::load_all(quiet = TRUE, debug = FALSE, attach = FALSE, compile = TRUE)
-    }
-  )
-}
-
-load.fork()
-glmGamPoi.env <- stack.envs(
-  getNamespace("glmGamPoi"),
-  # original package does not provide the fisher scoring step methods, so we compile/export them manually
-  sourceH("https://raw.githubusercontent.com/const-ae/glmGamPoi/refs/heads/devel/inst/include/fisher_scoring_steps.h", list(NumericType = "double"))
-)
-glmGamPoi2.env <- getNamespace("glmGamPoi2")
-
-PERF_OPTIM_CONF <- list(delay_mu = TRUE, offset_as_vec = TRUE, use_nr_overdisp_impl = TRUE)
-
-
-if (TRUE) {
-  sce <- muscData::Kang18_8vs8()
-  sce <- sce[rowSums(counts(sce)) > 5, !is.na(sce$cell)]
-  sce <- glmGamPoi2::pseudobulk(sce, group_by = vars(ind, stim, cell_type = cell))
-
-  design <- ~ stim * cell_type + ind
-  out <- bench::mark(
-    glmGamPoi = {
-      ref <- glmGamPoi::glm_gp(sce, design)
-    },
-    glmGamPoi2 = {
-      new <- glmGamPoi2::glm_gp(
-        sce,
-        design,
-        perf_optim = append(
-          PERF_OPTIM_CONF,
-          list(do_parallel = parallel::detectCores())
-        )
-      )
-    },
-    filter_gc = FALSE,
-    check = FALSE,
-    iterations = 1
-  )
-  mod.vals <- diff.dt(ref, new)
-
-  mod.vals.pl <- mod.vals[c("stimstim", "deviance", "overdispersion")] |>
-    rbindlist(idcol = "variable") |>
-    ggplot() +
-    aes(x = value.glmGamPoi - value.glmGamPoi2) +
-    geom_density(fill = "grey") +
-    geom_vline(xintercept = 0, linetype = "dashed", colour = "red", alpha = 0.5) +
-    facet_wrap(vars(variable), scales = "free")
 }
