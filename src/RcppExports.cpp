@@ -291,13 +291,13 @@ BEGIN_RCPP
 END_RCPP
 }
 // estimate_overdispersions_fast_delayed
-List estimate_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd>& model_matrix, const RObject offset_matrix, const Eigen::Map<Eigen::MatrixXd>& beta_mat_v, const bool do_cox_reid_adjustment, const int n_subsamples, const int max_iter);
+List estimate_overdispersions_fast_delayed(const RObject Y, const NumericMatrix model_matrix, const RObject offset_matrix, const Eigen::Map<Eigen::MatrixXd>& beta_mat_v, const bool do_cox_reid_adjustment, const int n_subsamples, const int max_iter);
 RcppExport SEXP _glmGamPoi2_estimate_overdispersions_fast_delayed(SEXP YSEXP, SEXP model_matrixSEXP, SEXP offset_matrixSEXP, SEXP beta_mat_vSEXP, SEXP do_cox_reid_adjustmentSEXP, SEXP n_subsamplesSEXP, SEXP max_iterSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const RObject >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type model_matrix(model_matrixSEXP);
+    Rcpp::traits::input_parameter< const NumericMatrix >::type model_matrix(model_matrixSEXP);
     Rcpp::traits::input_parameter< const RObject >::type offset_matrix(offset_matrixSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type beta_mat_v(beta_mat_vSEXP);
     Rcpp::traits::input_parameter< const bool >::type do_cox_reid_adjustment(do_cox_reid_adjustmentSEXP);

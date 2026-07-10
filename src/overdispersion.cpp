@@ -119,7 +119,7 @@ List estimate_overdispersions_fast(const RObject Y, const RObject mean_matrix, c
 }
 
 // [[Rcpp::export]]
-List estimate_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eigen::MatrixXd> &model_matrix, const RObject offset_matrix,
+List estimate_overdispersions_fast_delayed(const RObject Y, const NumericMatrix model_matrix, const RObject offset_matrix,
                                            const Eigen::Map<Eigen::MatrixXd> &beta_mat_v, const bool do_cox_reid_adjustment, const int n_subsamples,
                                            const int max_iter) {
   Rtatami::BoundNumericPointer Y_bm_ptr(Y);
@@ -148,6 +148,9 @@ List estimate_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eig
   // This is calling back to R, which simplifies my code a lot
   Environment glmGamPoiEnv = Environment::namespace_env("glmGamPoi2");
   Function overdispersion_mle_impl = glmGamPoiEnv["overdispersion_mle_impl"];
+
+  const Map<const MatrixXd> model_matrix_m(model_matrix.cbegin(), model_matrix.nrow(), model_matrix.ncol());
+
   for (int gene_idx = 0; gene_idx < n_genes; gene_idx++) {
     if (gene_idx % 100 == 0)
       Rcpp::checkUserInterrupt();
@@ -159,7 +162,8 @@ List estimate_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eig
 
     const Map<const VectorXd> counts_v(cptr, n_samples), off_v(optr, n_samples);
     Map<VectorXd> mu_v(mu.begin(), n_samples);
-    mu_v = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off_v);
+    const auto beta_hat = beta_mat_v.row(gene_idx).transpose();
+    mu_v = calculate_mu_add<VectorXd>(model_matrix_m, beta_hat, off_v);
 
     // Check if the first value is NA, if yes all of them will be
     if (n_samples > 0 && std::isnan(mu[0])) {
@@ -167,7 +171,7 @@ List estimate_overdispersions_fast_delayed(const RObject Y, const Eigen::Map<Eig
       iterations(gene_idx) = max_iter;
       messages(gene_idx) = "Mean estimate was NA. Cannot estimate overdispersion";
     } else {
-      List dispRes = Rcpp::as<List>(overdispersion_mle_impl(counts, mu, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter));
+      List dispRes = Rcpp::as<List>(overdispersion_mle_impl(counts, mu, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, gene_idx == 9520));
       estimates(gene_idx) = Rcpp::as<double>(dispRes["estimate"]);
       iterations(gene_idx) = Rcpp::as<double>(dispRes["iterations"]);
       messages(gene_idx) = Rcpp::as<String>(dispRes["message"]);
@@ -268,7 +272,8 @@ NumericVector estimate_global_overdispersions_fast_delayed(const RObject Y, cons
       const Map<const VectorXd> counts_v(cptr, n_samples), off_v(optr, n_samples);
 
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
-      const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off_v);
+      const auto beta_hat = beta_mat_v.row(gene_idx).transpose();
+      const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_hat, off_v);
 
       VectorXd unique_counts, count_frequencies;
       make_map_if_small(unique_counts, count_frequencies, counts_v, /*stop_if_larger = */ n_samples / 2);
@@ -309,13 +314,9 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
     throw std::runtime_error("Dimensions of Y and mean_matrix do not match");
   }
 
-  std::vector<double> estimates(n_genes);
-  std::vector<int> iterations(n_genes);
-  std::vector<std::string> messages(n_genes);
-
   const bool do_sub = n_subsamples < n_samples;
 
-  const auto run = [&](const int start, const int length) -> void {
+  const auto run = [&](const int start, const int length, auto &estimates, auto &iterations, auto &messages) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     auto mean_mat_ext = tatami::consecutive_extractor<false>(mean_mat_bm, true, start, length);
     VectorXd counts(n_samples), mu(n_samples);
@@ -346,12 +347,15 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
       const Map<const VectorXd> counts_v(cptr, n_samples), mu_v(mptr, n_samples);
 
+      // important to use && to keep reference semantics for &string AND allow for Rcpp's string proxy type that is by-value
+      auto &&msg_out = messages[gene_idx];
+
       // Check if the first value is NA, if yes all of them will be
       // std::isnan is valid here since the R NA value for a double is NaN
       if (n_samples > 0 && std::isnan(mu_v(0))) {
         estimates[gene_idx] = NAN;
         iterations[gene_idx] = max_iter;
-        messages[gene_idx] = "Mean estimate was NA. Cannot estimate overdispersion";
+        msg_out = "Mean estimate was NA. Cannot estimate overdispersion";
         continue;
       }
 
@@ -363,27 +367,42 @@ List estimate_overdispersions_nr_fast(const RObject Y, const RObject mean_matrix
         const VectorXd counts_s = counts_v(idx_s);
         const VectorXd mu_s = mu_v(idx_s);
         const MatrixXd mm_s = model_matrix(idx_s, Eigen::all);
-        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_s, mu_s, mm_s, do_cox_reid_adjustment,
-                                   max_iter, tolerance);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], msg_out, counts_s, mu_s, mm_s, do_cox_reid_adjustment, max_iter,
+                                   tolerance);
       } else {
-        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_v, mu_v, model_matrix,
-                                   do_cox_reid_adjustment, max_iter, tolerance);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], msg_out, counts_v, mu_v, model_matrix, do_cox_reid_adjustment, max_iter,
+                                   tolerance);
       }
     }
   };
 
   if (do_parallel > 0) {
-    run_par(run, n_genes, do_parallel);
-  } else {
-    run(0, n_genes);
-  }
-  // check if we got an interrupt, if yes, re-raise it
-  if (check_interrupt()) {
-    std::raise(SIGINT);
-    Rcpp::checkUserInterrupt();
-  }
+    std::vector<double> estimates(n_genes);
+    std::vector<int> iterations(n_genes);
+    std::vector<std::string> messages(n_genes);
 
-  return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);
+    const auto run_w = [&run, &estimates, &iterations, &messages](const int start, const int length) -> void {
+      run(start, length, estimates, iterations, messages);
+    };
+
+    run_par(run_w, n_genes, do_parallel);
+    if (check_interrupt()) {
+      std::raise(SIGINT);
+      Rcpp::checkUserInterrupt();
+    }
+    return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);
+  } else {
+    NumericVector estimates(n_genes);
+    IntegerVector iterations(n_genes);
+    CharacterVector messages(n_genes);
+
+    run(0, n_genes, estimates, iterations, messages);
+    if (check_interrupt()) {
+      std::raise(SIGINT);
+      Rcpp::checkUserInterrupt();
+    }
+    return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);
+  }
 }
 
 // [[Rcpp::export]]
@@ -405,7 +424,7 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
 
   const bool do_sub = n_subsamples < n_samples;
 
-  const auto run = [&](const int start, const int length) -> void {
+  const auto run = [&](const int start, const int length, auto &estimates, auto &iterations, auto &messages) -> void {
     auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
     std::unique_ptr<tatami::OracularDenseExtractor<double, int>> offsets_ext;
     if (offsets_bm.nrow() > 1) {
@@ -442,6 +461,10 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
       // not using copy_n to avoid copies when not necessary, using Eigen::Map type instead.
       const Map<const VectorXd> counts_v(cptr, n_samples), off_v(optr, n_samples);
 
+      // important to use && to keep reference semantics for &string AND allow for Rcpp's string proxy type that is by-value
+      auto &&msg_out = messages[gene_idx];
+
+      const auto beta_hat = beta_mat_v.row(gene_idx).transpose();
       if (do_sub) {
         // dereferencing gen & idx is safe when gated against do_sub
         std::shuffle(idx->begin(), idx->end(), *gen);
@@ -451,39 +474,54 @@ List estimate_overdispersions_nr_fast_delayed(const RObject Y, const Eigen::Map<
         const VectorXd off_s = off_v(idx_s);
         const MatrixXd mm_s = model_matrix(idx_s, Eigen::all);
 
-        const auto mu = calculate_mu_add<VectorXd>(mm_s, beta_mat_v.row(gene_idx).transpose(), off_s);
+        const auto mu = calculate_mu_add<VectorXd>(mm_s, beta_hat, off_s);
         if (n_samples > 0 && std::isnan(mu(0))) {
           estimates[gene_idx] = NAN;
           iterations[gene_idx] = max_iter;
-          messages[gene_idx] = "Mean estimate was NA. Cannot estimate overdispersion";
+          msg_out = "Mean estimate was NA. Cannot estimate overdispersion";
           continue;
         }
-        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_s, mu, mm_s, do_cox_reid_adjustment,
-                                   max_iter, tolerance);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], msg_out, counts_s, mu, mm_s, do_cox_reid_adjustment, max_iter,
+                                   tolerance);
       } else {
-        const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_mat_v.row(gene_idx).transpose(), off);
+        const auto mu = calculate_mu_add<VectorXd>(model_matrix, beta_hat, off);
         if (n_samples > 0 && std::isnan(mu(0))) {
           estimates[gene_idx] = NAN;
           iterations[gene_idx] = max_iter;
-          messages[gene_idx] = "Mean estimate was NA. Cannot estimate overdispersion";
+          msg_out = "Mean estimate was NA. Cannot estimate overdispersion";
           continue;
         }
-        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], messages[gene_idx], counts_v, mu, model_matrix, do_cox_reid_adjustment,
-                                   max_iter, tolerance);
+        overdispersion_mle_NR_impl(estimates[gene_idx], iterations[gene_idx], msg_out, counts_v, mu, model_matrix, do_cox_reid_adjustment, max_iter,
+                                   tolerance);
       }
     }
   };
 
   if (do_parallel > 0) {
-    run_par(run, n_genes, do_parallel);
-  } else {
-    run(0, n_genes);
-  }
-  // check if we got an interrupt, if yes, re-raise it
-  if (check_interrupt()) {
-    std::raise(SIGINT);
-    Rcpp::checkUserInterrupt();
-  }
+    std::vector<double> estimates(n_genes);
+    std::vector<int> iterations(n_genes);
+    std::vector<std::string> messages(n_genes);
 
-  return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);
+    const auto run_w = [&run, &estimates, &iterations, &messages](const int start, const int length) -> void {
+      run(start, length, estimates, iterations, messages);
+    };
+
+    run_par(run_w, n_genes, do_parallel);
+    if (check_interrupt()) {
+      std::raise(SIGINT);
+      Rcpp::checkUserInterrupt();
+    }
+    return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);
+  } else {
+    NumericVector estimates(n_genes);
+    IntegerVector iterations(n_genes);
+    CharacterVector messages(n_genes);
+
+    run(0, n_genes, estimates, iterations, messages);
+    if (check_interrupt()) {
+      std::raise(SIGINT);
+      Rcpp::checkUserInterrupt();
+    }
+    return List::create(_["estimate"] = estimates, _["iterations"] = iterations, _["message"] = messages);
+  }
 }
