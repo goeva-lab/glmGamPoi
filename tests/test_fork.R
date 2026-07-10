@@ -65,37 +65,58 @@ sourceH <- function(pth, monomorph = list(), export.all = TRUE, ...) {
   env
 }
 
-obj.pl <- function(res, i, min_x = -10, max_x = 10, n = 1000, fn.ns = "glmGamPoi", cr.adj = TRUE) {
-  obj.fn <- getFromNamespace("conventional_loglikelihood_fast", fn.ns)
-  drv.fn <- getFromNamespace("conventional_score_function_fast", fn.ns)
-  hess.fn <- getFromNamespace("conventional_deriv_score_function_fast", fn.ns)
+obj.pl <- function(res, i, min_x = -10, max_x = 10, n = 1000, fn.ns = c("glmGamPoi", "glmGamPoi2"), cr.adjs = c(TRUE, FALSE)) {
   inp.range <- rev(seq(min_x, max_x, (max_x - min_x) / n))
   mu <- if (is.function(res[["Mu"]])) res[["Mu"]](i = i) else res[["Mu"]][i, ]
+  mu[mu <= 1e-128] <- 1e-6
   y <- SummarizedExperiment::assay(res[["data"]])[i, ]
 
   df <- rbindlist(
-    purrr::map(list("objective" = obj.fn, "derivative" = drv.fn, "hessian" = hess.fn), function(f) {
-      data.table(
-        x = inp.range,
-        value = vapply(inp.range, function(e) f(y, mu, e, res[["model_matrix"]], cr.adj), numeric(1))
+    purrr::map(setNames(nm = fn.ns), function(ns) {
+      rbindlist(
+        purrr::map(
+          list(
+            "objective" = getFromNamespace("conventional_loglikelihood_fast", ns),
+            "derivative" = getFromNamespace("conventional_score_function_fast", ns),
+            "hessian" = getFromNamespace("conventional_deriv_score_function_fast", ns)
+          ),
+          function(f) {
+            rbindlist(
+              purrr::map(setNames(nm = cr.adjs), function(cr.adj) {
+                data.table(
+                  x = inp.range,
+                  value = vapply(inp.range, function(e) f(y, mu, e, res[["model_matrix"]], cr.adj), numeric(1))
+                )
+              }),
+              idcol = "cr.adj"
+            )
+          }
+        ),
+        idcol = "fn"
       )
     }),
-    idcol = "fn"
+    idcol = "ns"
   )
-  max.obj <- df[fn == "objective"][which.max(value)]
+  max.obj <- df[fn == "objective", .SD[which.max(value)], by = .(ns, cr.adj)]
   ggplot(df) +
-    aes(x = x, y = value, colour = forcats::fct_inorder(fn)) +
-    geom_point(shape = ".") +
+    aes(x = x, y = value, colour = ns, linetype = ns) +
+    geom_line(alpha = 0.7) +
     geom_vline(
       inherit.aes = TRUE,
       data = rbind(
         max.obj,
-        df[(fn == "derivative") & between(x, max.obj[, x] - 10, max.obj[, x] + 10)][which.min(abs(value))]
+        df[
+          (fn == "derivative")
+        ][
+          max.obj[, .(x, ns, cr.adj)],
+          on = .(ns, cr.adj)
+        ][, .SD[which.min(abs(value) + 1e-03 * (x - i.x)^2)], by = .(ns, cr.adj), .SDcols = -c("i.x")]
       ),
-      aes(xintercept = x)
+      aes(xintercept = x),
+      show.legend = FALSE
     ) +
-    facet_grid(rows = vars(forcats::fct_inorder(fn)), scales = "free_y") +
-    guides(linetype = "none", colour = "none", shape = "none")
+    facet_grid(rows = vars(fn = forcats::fct_inorder(fn)), cols = vars(cr.adj), scales = "free_y", labeller = label_both) +
+    labs(colour = NULL, linetype = NULL)
 }
 
 
@@ -166,20 +187,20 @@ fn.w.env <- function(fn, env) {
   fn
 }
 
-load.fork <- function() {
+# using clang as default instead of gcc because clang's error messages are more readable
+load.fork <- function(cc = "clang++", quiet = TRUE, compile = TRUE) {
+  if (isTRUE(compile)) {
+    pkgbuild::clean_dll()
+  }
   withr::with_makevars(
     assignment = "=",
     c(
-      # using clang instead of gcc because error messages during compilation are more readable
-      CXX17 = "clang++ -fuse-ld=lld -flto -ffat-lto-objects -fopenmp",
+      CXX17 = sprintf("%s -fuse-ld=lld -flto -ffat-lto-objects -fopenmp", cc),
       CXX17STD = "-std=c++17",
       CXX17FLAGS = "-O3 -march=native",
       LDFLAGS = "-L/usr/lib64/R/lib -Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs"
     ),
-    {
-      pkgbuild::clean_dll()
-      pkgload::load_all(quiet = TRUE, debug = FALSE, attach = FALSE, compile = TRUE)
-    }
+    pkgload::load_all(quiet = quiet, compile = compile, debug = FALSE, attach = FALSE)
   )
 }
 load.fork()
