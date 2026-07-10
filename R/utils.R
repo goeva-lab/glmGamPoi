@@ -223,7 +223,8 @@ div_mtx_colwise <- function(lhs, rhs) {
       return(lhs)
     }
   }
-  sweep(lhs, 2, rhs, `/`)
+
+  t(t(lhs) / rhs)
 }
 
 handle_perf_optim_parameter <- function(param) {
@@ -239,7 +240,7 @@ handle_perf_optim_parameter <- function(param) {
     list(
       "offset_as_vec" = param,
       "cast_dgC_Y_to_dgR" = param,
-      "do_parallel" = as.integer(param),
+      "do_parallel" = if (param) parallel::detectCores() else 0L,
       "delay_mu" = param,
       "use_nr_overdisp_impl" = param
     )
@@ -263,12 +264,32 @@ handle_perf_optim_parameter <- function(param) {
     ))
   }
 
+  if(out[["do_parallel"]] == 1L){
+    warning(paste0(
+      c(
+        "got perf_optim$do_parallel=1, meaning no parallelization is enabled while still incurring cost of setting up parallelization-safe machinery.",
+        "this is only useful for internal testing, if you wish to just disable parallelization, you should instead set perf_optim$do_parallel=0."
+      ),
+      collapse = "\n"
+    ))
+  }
+  n_cores <- parallel::detectCores()
+  if(out[["do_parallel"]] > n_cores){
+    warning(paste0(
+      c(
+        sprintf("got perf_optim$do_parallel=%s, which is greater than the number of cores detected by `parallel::detectCores() (%s)`.", n_cores, n_cores),
+        "unless parallel::detectCores is returning an incorrect value, there is generally no reason to do this as spawning more threads than physical cores will usually harm performance."
+      ),
+      collapse = "\n"
+    ))
+  }
+
   out
 }
 
-handle_Mu_rowmeans <- function(Mu, n.rows) {
+handle_Mu_rowmeans <- function(Mu, n.rows, row.names) {
   if (is.function(Mu)) {
-    vapply(seq_len(n.rows), function(i) mean(Mu(i = i)), numeric(1))
+    vapply(setNames(seq_len(n.rows), nm = row.names), function(i) mean(Mu(i = i)), numeric(1))
   } else {
     DelayedMatrixStats::rowMeans2(Mu)
   }

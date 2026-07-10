@@ -134,7 +134,7 @@ glm_gp_impl <- function(Y, model_matrix,
     }
 
     if(isTRUE(overdispersion_shrinkage)){
-      dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = handle_Mu_rowmeans(Mu, nrow(Y)),
+      dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = handle_Mu_rowmeans(Mu, nrow(Y), rownames(Y)),
                                                    df = subsample - ncol(model_matrix),
                                                    ql_disp_trend  = length(disp_est) >= 100,
                                                    npoints = max(0.1 * length(disp_est), 100),
@@ -167,7 +167,7 @@ glm_gp_impl <- function(Y, model_matrix,
   }else if(isTRUE(overdispersion_shrinkage) || is.numeric(overdispersion_shrinkage)){
     # Given predefined disp_est shrink them
     disp_est <- disp_init
-    dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = handle_Mu_rowmeans(Mu, nrow(Y)),
+    dispersion_shrinkage <- overdispersion_shrinkage(disp_est, gene_means = handle_Mu_rowmeans(Mu, nrow(Y), rownames(Y)),
                                                      df = subsample - ncol(model_matrix),
                                                      disp_trend = overdispersion_shrinkage, verbose = verbose)
     disp_latest <- dispersion_shrinkage$dispersion_trend
