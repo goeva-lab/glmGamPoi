@@ -177,7 +177,7 @@ conventional_overdispersion_mle <- function(y, mean_vector, model_matrix = matri
   }
 
   # Mu = 0 makes problems
-  mean_vector[mean_vector == 0] <- 1e-6
+  mean_vector[mean_vector < 1e-128] <- 1e-6
 
   far_left_value <- conventional_score_function_fast(y, mu = mean_vector, log_theta = log(1e-8), model_matrix = model_matrix, do_cr_adj = do_cox_reid_adjustment, tab[[1]], tab[[2]])
   if (far_left_value < 0) {
