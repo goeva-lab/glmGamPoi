@@ -55,14 +55,14 @@ double conventional_deriv_score_function_fast(const NumericVector y, const Eigen
   return conventional_deriv_score_function_fast_impl(y_v, mu, log_theta, model_matrix, do_cr_adj, unique_counts_v, count_frequencies_v);
 }
 // [[Rcpp::export]]
-List NR_overdispersion_mle(const NumericVector y, const Eigen::Map<Eigen::VectorXd> &mean_vector, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
+List NR_overdispersion_mle(const NumericVector y, const Eigen::Map<Eigen::VectorXd> &mu_vector, const Eigen::Map<Eigen::MatrixXd> &model_matrix,
                            const bool do_cox_reid_adjustment, const int max_iter, const double tolerance = 1e-8) {
   const Map<const VectorXd> y_v(y.begin(), y.size());
 
   double est = NAN;
   int iters = -1;
   std::string msg = "";
-  overdispersion_mle_NR_impl(est, iters, msg, y_v, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance);
+  overdispersion_mle_NR_impl(est, iters, msg, y_v, mu_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance);
 
   return List::create(_["estimate"] = est, _["iterations"] = iters, _["message"] = msg);
 }

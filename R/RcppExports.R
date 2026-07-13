@@ -65,8 +65,8 @@ conventional_deriv_score_function_fast <- function(y, mu, log_theta, model_matri
     .Call(`_glmGamPoi2_conventional_deriv_score_function_fast`, y, mu, log_theta, model_matrix, do_cr_adj, unique_counts, count_frequencies)
 }
 
-NR_overdispersion_mle <- function(y, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance = 1e-8) {
-    .Call(`_glmGamPoi2_NR_overdispersion_mle`, y, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance)
+NR_overdispersion_mle <- function(y, mu_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance = 1e-8) {
+    .Call(`_glmGamPoi2_NR_overdispersion_mle`, y, mu_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance)
 }
 
 estimate_overdispersions_fast <- function(Y, mean_matrix, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter) {

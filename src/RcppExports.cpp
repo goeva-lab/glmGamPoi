@@ -259,18 +259,18 @@ BEGIN_RCPP
 END_RCPP
 }
 // NR_overdispersion_mle
-List NR_overdispersion_mle(const NumericVector y, const Eigen::Map<Eigen::VectorXd>& mean_vector, const Eigen::Map<Eigen::MatrixXd>& model_matrix, const bool do_cox_reid_adjustment, const int max_iter, const double tolerance);
-RcppExport SEXP _glmGamPoi2_NR_overdispersion_mle(SEXP ySEXP, SEXP mean_vectorSEXP, SEXP model_matrixSEXP, SEXP do_cox_reid_adjustmentSEXP, SEXP max_iterSEXP, SEXP toleranceSEXP) {
+List NR_overdispersion_mle(const NumericVector y, const Eigen::Map<Eigen::VectorXd>& mu_vector, const Eigen::Map<Eigen::MatrixXd>& model_matrix, const bool do_cox_reid_adjustment, const int max_iter, const double tolerance);
+RcppExport SEXP _glmGamPoi2_NR_overdispersion_mle(SEXP ySEXP, SEXP mu_vectorSEXP, SEXP model_matrixSEXP, SEXP do_cox_reid_adjustmentSEXP, SEXP max_iterSEXP, SEXP toleranceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type mean_vector(mean_vectorSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::VectorXd>& >::type mu_vector(mu_vectorSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type model_matrix(model_matrixSEXP);
     Rcpp::traits::input_parameter< const bool >::type do_cox_reid_adjustment(do_cox_reid_adjustmentSEXP);
     Rcpp::traits::input_parameter< const int >::type max_iter(max_iterSEXP);
     Rcpp::traits::input_parameter< const double >::type tolerance(toleranceSEXP);
-    rcpp_result_gen = Rcpp::wrap(NR_overdispersion_mle(y, mean_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance));
+    rcpp_result_gen = Rcpp::wrap(NR_overdispersion_mle(y, mu_vector, model_matrix, do_cox_reid_adjustment, max_iter, tolerance));
     return rcpp_result_gen;
 END_RCPP
 }

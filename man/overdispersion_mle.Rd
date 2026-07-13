@@ -91,9 +91,9 @@ additional maintenance burden.
  # estimate = 0
  overdispersion_mle(y)
  # with different mu, overdispersion estimate changes
- overdispersion_mle(y, mean = 15)
+ overdispersion_mle(y, mu = 15)
  # Cox-Reid adjustment changes the result
- overdispersion_mle(y, mean = 15, do_cox_reid_adjustment = FALSE)
+ overdispersion_mle(y, mu = 15, do_cox_reid_adjustment = FALSE)
 
 
  # Many very small counts, true overdispersion = 50
