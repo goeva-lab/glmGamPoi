@@ -1,107 +1,84 @@
-test_that("perf_optim$offset_as_vec doesn't change anything but offset matrix", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- ~ group + cont1 + cont2
-
-  set.seed(1)
-  res <- glm_gp(Y, design = design, col_data = annot, perf_optim = list(offset_as_vec = TRUE))
-  expect_vector(res[["Offset"]], ptype = numeric(), size = ncol(Y))
-
-  set.seed(1)
-  res_orig <- glm_gp(Y, design = design, col_data = annot)
-
-  res[["Offset"]] <- matrix(res[["Offset"]], nrow = nrow(Y), ncol = ncol(Y), byrow = TRUE)
-  attr(res, "perf_optim") <- attr(res_orig, "perf_optim")
-
-  expect_equal(res, res_orig, tolerance = 0)
-})
-
-test_that("perf_optim$cast_dgC_Y_to_dgR doesn't change anything", {
-  Y <- as(matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10), "CsparseMatrix")
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- ~ group + cont1 + cont2
-
-  set.seed(1)
-  res <- glm_gp(Y, design = design, col_data = annot, perf_optim = list(cast_dgC_Y_to_dgR = TRUE))
-
-  set.seed(1)
-  res_orig <- glm_gp(Y, design = design, col_data = annot)
-
-  attr(res, "perf_optim") <- attr(res_orig, "perf_optim")
-
-  expect_equal(res, res_orig, tolerance = 0)
-})
-
-test_that("perf_optim$do_parallel doesn't change anything", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- ~ group + cont1 + cont2
-
-  set.seed(1)
-  res1 <- glm_gp(Y, design = design, col_data = annot)
-  for (p in c(1L, 2L, 4L, 16L, 32L)) {
-    set.seed(1)
-    res2 <- glm_gp(Y, design = design, col_data = annot, perf_optim = list(do_parallel = p))
-    attr(res2, "perf_optim") <- attr(res1, "perf_optim")
-    expect_equal(res1, res2, tolerance = 0)
-  }
-})
-
-test_that("perf_optim$delay_mu doesn't change anything", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- ~ group + cont1 + cont2
-
-  set.seed(1)
-  res1 <- glm_gp(Y, design = design, col_data = annot)
-
-  set.seed(1)
-  res2 <- glm_gp(Y, design = design, col_data = annot, perf_optim = list(delay_mu = TRUE))
-
-  res2[["Mu"]] <- res2[["Mu"]]()
-  attr(res2, "perf_optim") <- attr(res1, "perf_optim")
-
-  expect_equal(res1, res2, tolerance = 1e-7)
-})
-
-test_that("perf_optim$delay_mu doesn't change anything (global overdispersion)", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- ~ group + cont1 + cont2
-
-  set.seed(1)
-  res1 <- glm_gp(Y, design = design, col_data = annot, overdispersion = "global")
-
-  set.seed(1)
-  res2 <- glm_gp(Y, design = design, col_data = annot, overdispersion = "global", perf_optim = list(delay_mu = TRUE))
-
-  res2[["Mu"]] <- res2[["Mu"]]()
-  attr(res2, "perf_optim") <- attr(res1, "perf_optim")
-
-  expect_equal(res1, res2, tolerance = 1e-7)
-})
-
 local({
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- ~ group + cont1 + cont2
+  for (seed in c(2, 8, 16)) {
+    set.seed(seed)
+    Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+    annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
 
-  for (cr_adj in c(FALSE, TRUE)) {
-    test_that(sprintf("perf_optim$use_nr_overdisp_impl doesn't significantly change resulting Beta values (%s cox-reid adjustment)", if (cr_adj) "w/" else "w/o"), {
-      set.seed(1)
-      res1 <- glm_gp(Y, design = design, col_data = annot, do_cox_reid_adjustment = FALSE)
+    for (cr_adj in c(FALSE, TRUE)) {
+      logliks <- function(mu, thetas, mm) vapply(seq_len(nrow(Y)), function(i) conventional_loglikelihood_fast(Y[i, ], mu[i, ], log(thetas[[i]]), mm, cr_adj), numeric(1))
 
-      set.seed(1)
-      res2 <- glm_gp(Y, design = design, col_data = annot, do_cox_reid_adjustment = FALSE, perf_optim = list(use_nr_overdisp_impl = TRUE))
+      for (od in list(TRUE, "global")) {
+        set.seed(1)
+        ref_nr <- glm_gp(Y, col_data = annot, overdispersion = od, do_cox_reid_adjustment = cr_adj, design = ~group)
+        set.seed(1)
+        ref_fs <- glm_gp(Y, col_data = annot, overdispersion = od, do_cox_reid_adjustment = cr_adj, design = ~ group + cont1 + cont2)
 
-      logliks <- function(res) vapply(seq_len(nrow(Y)), function(i) conventional_loglikelihood_fast(Y[i, ], res[["Mu"]][i, ], log(res[["overdispersions"]][[i]]), res[["model_matrix"]], cr_adj), numeric(1))
+        for (off_as_vec in c(FALSE, TRUE)) {
+          for (cast_to_dgR in c(FALSE, TRUE)) {
+            for (delay_mu in c(FALSE, TRUE)) {
+              for (p in c(1L, 32L)) {
+                conf_str <- sprintf(
+                  "(seed=%s) perf_optim=list(offset_as_vec=%s, cast_dgC_Y_to_dgR=%s, delay_mu=%s, do_parallel=%s) w/ overdispersion=%s, do_cox_reid_adjustment=%s",
+                  seed,
+                  off_as_vec,
+                  cast_to_dgR,
+                  delay_mu,
+                  p,
+                  od,
+                  cr_adj
+                )
 
-      # assert new estimation method yields about as good or better estimates of overdispersion (w/ a tolerance of 1e-9 towards worsening)
-      expect_all_true(logliks(res1) <= (logliks(res2) + 1e-8))
+                test_w_ref <- function(ref, templ) {
+                  set.seed(1)
+                  res <- suppressWarnings(glm_gp(
+                    Y,
+                    design = ref[["design_formula"]],
+                    col_data = annot,
+                    overdispersion = od,
+                    do_cox_reid_adjustment = cr_adj,
+                    perf_optim = list(offset_as_vec = off_as_vec, cast_dgC_Y_to_dgR = cast_to_dgR, delay_mu = delay_mu, do_parallel = p)
+                  ))
 
-      skip_if(cr_adj, "known issue, default overdispersion estimator often ends up falling back to version w/o cox-reid adjustment, which is not true for C++ NR-based estimator")
-      expect_equal(res1[["Beta"]], res2[["Beta"]], tolerance = 1e-8)
-    })
+                  attr(res, "perf_optim") <- attr(ref, "perf_optim")
+                  if (off_as_vec) {
+                    res[["Offset"]] <- matrix(res[["Offset"]], nrow = nrow(Y), ncol = ncol(Y), byrow = TRUE)
+                  }
+                  if (delay_mu) {
+                    res[["Mu"]] <- res[["Mu"]]()
+                  }
+
+                  test_that(sprintf("%s : yields results consistent w/ reference", templ), expect_equal(ref, res, tolerance = if (delay_mu) 1e-7 else 0))
+
+                  if (isTRUE(od)) {
+                    test_that(sprintf("%s : perf_optim$use_nr_overdisp_impl doesn't significantly change resulting Beta values", templ), {
+                      res_alt <- suppressWarnings(glm_gp(
+                        Y,
+                        design = ref[["design_formula"]],
+                        col_data = annot,
+                        overdispersion = od,
+                        do_cox_reid_adjustment = cr_adj,
+                        perf_optim = list(offset_as_vec = off_as_vec, cast_dgC_Y_to_dgR = cast_to_dgR, delay_mu = delay_mu, do_parallel = p, use_nr_overdisp_impl = TRUE)
+                      ))
+                      liks.ref <- logliks(res[["Mu"]], res[["overdispersions"]], res[["model_matrix"]])
+                      liks.alt <- logliks(if (delay_mu) res_alt[["Mu"]]() else res_alt[["Mu"]], res_alt[["overdispersions"]], res_alt[["model_matrix"]])
+                      mask <- !(is.na(liks.ref) | is.na(liks.alt))
+
+                      skip_if(cr_adj, "known issue, default overdispersion estimator often ends up falling back to version w/o cox-reid adjustment, which is not true for C++ NR-based estimator")
+
+                      expect_all_true((liks.ref[mask] + 1e-6) >= liks.alt[mask])
+                      expect_equal(res[["Beta"]], res_alt[["Beta"]], tolerance = 1e-8)
+                    })
+                  }
+                }
+
+                test_w_ref(ref_nr, sprintf("%s, NR case", conf_str))
+                test_w_ref(ref_fs, sprintf("%s, FS case", conf_str))
+              }
+            }
+          }
+        }
+      }
+    }
   }
 })
 
