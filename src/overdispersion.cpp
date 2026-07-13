@@ -171,7 +171,8 @@ List estimate_overdispersions_fast_delayed(const RObject Y, const NumericMatrix 
       iterations(gene_idx) = max_iter;
       messages(gene_idx) = "Mean estimate was NA. Cannot estimate overdispersion";
     } else {
-      List dispRes = Rcpp::as<List>(overdispersion_mle_impl(counts, mu, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, gene_idx == 9520));
+      List dispRes =
+          Rcpp::as<List>(overdispersion_mle_impl(counts, mu, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, gene_idx == 9520));
       estimates(gene_idx) = Rcpp::as<double>(dispRes["estimate"]);
       iterations(gene_idx) = Rcpp::as<double>(dispRes["iterations"]);
       messages(gene_idx) = Rcpp::as<String>(dispRes["message"]);
@@ -195,8 +196,8 @@ NumericVector estimate_global_overdispersions_fast(const RObject Y, const RObjec
   NumericVector log_likelihoods(n_spline_points);
 
   const auto run = [&](const int start, const int length) -> void {
-    auto Y_ext = tatami::consecutive_extractor<false>(&Y_bm, true, start, length);
-    auto mean_mat_ext = tatami::consecutive_extractor<false>(&mean_mat_bm, true, start, length);
+    auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
+    auto mean_mat_ext = tatami::consecutive_extractor<false>(mean_mat_bm, true, start, length);
     VectorXd counts(n_samples), mu(n_samples);
 
     const auto grp_max_id = start + length;
@@ -253,8 +254,13 @@ NumericVector estimate_global_overdispersions_fast_delayed(const RObject Y, cons
   NumericVector log_likelihoods(n_spline_points);
 
   const auto run = [&](const int start, const int length) -> void {
-    auto Y_ext = tatami::consecutive_extractor<false>(&Y_bm, true, start, length);
-    auto offsets_ext = tatami::consecutive_extractor<false>(&offsets_bm, true, start, length);
+    auto Y_ext = tatami::consecutive_extractor<false>(Y_bm, true, start, length);
+    std::unique_ptr<tatami::OracularDenseExtractor<double, int>> offsets_ext;
+    if (offsets_bm.nrow() > 1) {
+      offsets_ext = tatami::consecutive_extractor<false>(offsets_bm, true, start, length);
+    } else {
+      offsets_ext = tatami::new_extractor<false, true>(offsets_bm, true, std::make_shared<ConstIndexOracle<0>>(n_genes));
+    }
     VectorXd counts(n_samples), off(n_samples);
 
     const auto grp_max_id = start + length;

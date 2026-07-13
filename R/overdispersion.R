@@ -104,11 +104,12 @@ overdispersion_mle <- function(y, mu, model_matrix = NULL, do_cox_reid_adjustmen
     } else {
       # This function calls overdispersion_mle() for each row, but is faster than a vapply()
       if (is.function(mu)) {
+        offs <- attr(mu, "offsets")
         (if (use_nr_overdisp_impl) {
           function(...) estimate_overdispersions_nr_fast_delayed(..., do_parallel = do_parallel)
         } else {
           estimate_overdispersions_fast_delayed
-        })(initializeCpp(y), model_matrix, initializeCpp(attr(mu, "offsets")), attr(mu, "betas"), do_cox_reid_adjustment, n_subsamples, max_iter)
+        })(initializeCpp(y), model_matrix, initializeCpp(if (is.vector(offs)) matrix(offs, nrow = 1) else offs), attr(mu, "betas"), do_cox_reid_adjustment, n_subsamples, max_iter)
       } else {
         (if (use_nr_overdisp_impl) {
           function(...) estimate_overdispersions_nr_fast(..., do_parallel = do_parallel)
@@ -260,7 +261,8 @@ estimate_global_overdispersion <- function(Y, Mu, model_matrix, do_cox_reid_adju
   # The runtime is linear with the number of `log_thetas`
   log_thetas <- seq(-6, 1, length.out = 10)
   log_likes <- if (is.function(Mu)) {
-    estimate_global_overdispersions_fast_delayed(initializeCpp(Y), model_matrix, initializeCpp(attr(Mu, "offsets")), attr(Mu, "betas"), do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
+    offs <- attr(Mu, "offsets")
+    estimate_global_overdispersions_fast_delayed(initializeCpp(Y), model_matrix, initializeCpp(if (is.vector(offs)) matrix(offs, nrow = 1) else offs), attr(Mu, "betas"), do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
   } else {
     estimate_global_overdispersions_fast(initializeCpp(Y), initializeCpp(Mu), model_matrix, do_cox_reid_adjustment, log_thetas, do_parallel = do_parallel)
   }
