@@ -277,7 +277,7 @@ handle_perf_optim_parameter <- function(param) {
   if(out[["do_parallel"]] > n_cores){
     warning(paste0(
       c(
-        sprintf("got perf_optim$do_parallel=%s, which is greater than the number of cores detected by `parallel::detectCores() (%s)`.", n_cores, n_cores),
+        sprintf("got perf_optim$do_parallel=%s, which is greater than the number of cores detected by `parallel::detectCores() (%s)`.", out[["do_parallel"]], n_cores),
         "unless parallel::detectCores is returning an incorrect value, there is generally no reason to do this as spawning more threads than physical cores will usually harm performance."
       ),
       collapse = "\n"
@@ -287,13 +287,28 @@ handle_perf_optim_parameter <- function(param) {
   out
 }
 
-handle_Mu_rowmeans <- function(Mu, n.rows, row.names) {
-  if (is.function(Mu)) {
-    vapply(setNames(seq_len(n.rows), nm = row.names), function(i) mean(Mu(i = i)), numeric(1))
-  } else {
-    DelayedMatrixStats::rowMeans2(Mu)
+handle_Mu_rowmeans <- local({
+  vec_off_fn <- compiler::cmpfun(function(gene_idx, beta_t, mm, offs) mean(calculate_mu(matrix(beta_t[, gene_idx], nrow = 1), mm, offs)), options = list(optimize = 3L))
+  mtx_off_fn <- compiler::cmpfun(function(gene_idx, beta_t, mm, offs_t) mean(calculate_mu(matrix(beta_t[, gene_idx], nrow = 1), mm, offs_t[, gene_idx])), options = list(optimize = 3L))
+
+  function(Mu, row.names) {
+    if (is.function(Mu)) {
+      beta_t <- t(attr(Mu, "betas"))
+      mm <- attr(Mu, "model_matrix")
+      offs <- attr(Mu, "offsets")
+
+      if (is.vector(offs)) {
+        vapply(setNames(seq_len(ncol(beta_t)), nm = row.names), vec_off_fn, numeric(1), beta_t = beta_t, mm = mm, offs = offs)
+      } else {
+        offs_t <- t(offs)
+        vapply(setNames(seq_len(ncol(beta_t)), nm = row.names), mtx_off_fn, numeric(1), beta_t = beta_t, mm = mm, offs_t = offs_t)
+      }
+    } else {
+      DelayedMatrixStats::rowMeans2(Mu)
+    }
   }
-}
+})
+
 
 handle_sub_param <- function(check.against, sub.param) {
   if (is.integer(check.against) && (length(check.against) == 1)) {

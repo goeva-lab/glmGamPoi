@@ -129,7 +129,7 @@ local({
     test_w_mu(calculate_mu(beta, mm, off))
   })
   test_that("use_nr_overdisp_impl w/ n_subsamples parameter works (w/ delayed Mu)", {
-    test_w_mu(list(offset_matrix = off, beta_mat = beta))
+    test_w_mu(mk_delayed_mu(beta, mm, off))
   })
 })
 

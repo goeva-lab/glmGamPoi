@@ -15,7 +15,7 @@ calculate_mu <- function(Beta, model_matrix, offset_matrix) {
 }
 
 mk_delayed_mu <- function(Beta, model_matrix, offset) {
-  function(i = NULL, j = NULL) {
+  fn <- function(i = NULL, j = NULL) {
     if (!is.null(i)) {
       i <- handle_sub_param(nrow(Beta), i)
       Beta <- Beta[i, , drop = FALSE]
@@ -28,4 +28,9 @@ mk_delayed_mu <- function(Beta, model_matrix, offset) {
     }
     calculate_mu(Beta, model_matrix, offset)
   }
+  attr(fn, "betas") <- Beta
+  attr(fn, "model_matrix") <- model_matrix
+  attr(fn, "offsets") <- offset
+
+  fn
 }
