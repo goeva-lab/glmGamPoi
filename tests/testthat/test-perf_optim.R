@@ -5,7 +5,16 @@ local({
     annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
 
     for (cr_adj in c(FALSE, TRUE)) {
-      logliks <- function(mu, thetas, mm) vapply(seq_len(nrow(Y)), function(i) conventional_loglikelihood_fast(Y[i, ], mu[i, ], log(thetas[[i]]), mm, cr_adj), numeric(1))
+      logliks.fn <- function(mu, thetas, mm) {
+        vapply(
+          seq_len(nrow(Y)),
+          function(i) {
+            mu_i <- if (is.function(mu)) mu(i, ) else mu[i, ]
+            conventional_loglikelihood_fast(Y[i, ], ifelse(mu_i > 1e-128, mu_i, 1e-6), log(thetas[[i]]), mm, cr_adj)
+          },
+          numeric(1)
+        )
+      }
 
       for (od in list(TRUE, "global")) {
         set.seed(1)
@@ -14,9 +23,9 @@ local({
         ref_fs <- glm_gp(Y, col_data = annot, overdispersion = od, do_cox_reid_adjustment = cr_adj, design = ~ group + cont1 + cont2)
 
         for (off_as_vec in c(FALSE, TRUE)) {
-          for (cast_to_dgR in c(FALSE, TRUE)) {
-            for (delay_mu in c(FALSE, TRUE)) {
-              for (p in c(1L, 32L)) {
+          for (delay_mu in c(FALSE, TRUE)) {
+            for (p in c(1L, 32L)) {
+              for (cast_to_dgR in c(FALSE, TRUE)) {
                 conf_str <- sprintf(
                   "(seed=%s) perf_optim=list(offset_as_vec=%s, cast_dgC_Y_to_dgR=%s, delay_mu=%s, do_parallel=%s) w/ overdispersion=%s, do_cox_reid_adjustment=%s",
                   seed,
@@ -50,22 +59,28 @@ local({
                   test_that(sprintf("%s : yields results consistent w/ reference", templ), expect_equal(ref, res, tolerance = if (delay_mu) 1e-7 else 0))
 
                   if (isTRUE(od)) {
+                    res_alt <- suppressWarnings(glm_gp(
+                      Y,
+                      design = ref[["design_formula"]],
+                      col_data = annot,
+                      overdispersion = od,
+                      do_cox_reid_adjustment = cr_adj,
+                      perf_optim = list(offset_as_vec = off_as_vec, cast_dgC_Y_to_dgR = cast_to_dgR, delay_mu = delay_mu, do_parallel = p, use_nr_overdisp_impl = TRUE)
+                    ))
+
+                    test_that(sprintf("%s : perf_optim$use_nr_overdisp_impl generates at worst deviances larger by 0.01%%", templ), {
+                      expect_all_true(((res_alt[["deviances"]] - res[["deviances"]]) / abs(res[["deviances"]])) <= 1e-4)
+                    })
+                    test_that(sprintf("%s : perf_optim$use_nr_overdisp_impl generates at worst loglikehoods smaller by 0.01%%", templ), {
+                      liks.ref <- logliks.fn(res[["Mu"]], res[["overdispersions"]], res[["model_matrix"]])
+                      liks.alt <- logliks.fn(res_alt[["Mu"]], res_alt[["overdispersions"]], res_alt[["model_matrix"]])
+                      mask <- !is.na(liks.ref)
+                      liks.ref <- liks.ref[mask]
+                      liks.alt <- liks.alt[mask]
+                      expect_all_true(((liks.ref - liks.alt) / abs(liks.ref)) <= 1e-4)
+                    })
                     test_that(sprintf("%s : perf_optim$use_nr_overdisp_impl doesn't significantly change resulting Beta values", templ), {
-                      res_alt <- suppressWarnings(glm_gp(
-                        Y,
-                        design = ref[["design_formula"]],
-                        col_data = annot,
-                        overdispersion = od,
-                        do_cox_reid_adjustment = cr_adj,
-                        perf_optim = list(offset_as_vec = off_as_vec, cast_dgC_Y_to_dgR = cast_to_dgR, delay_mu = delay_mu, do_parallel = p, use_nr_overdisp_impl = TRUE)
-                      ))
-                      liks.ref <- logliks(res[["Mu"]], res[["overdispersions"]], res[["model_matrix"]])
-                      liks.alt <- logliks(if (delay_mu) res_alt[["Mu"]]() else res_alt[["Mu"]], res_alt[["overdispersions"]], res_alt[["model_matrix"]])
-                      mask <- !(is.na(liks.ref) | is.na(liks.alt))
-
                       skip_if(cr_adj, "known issue, default overdispersion estimator often ends up falling back to version w/o cox-reid adjustment, which is not true for C++ NR-based estimator")
-
-                      expect_all_true((liks.ref[mask] + 1e-6) >= liks.alt[mask])
                       expect_equal(res[["Beta"]], res_alt[["Beta"]], tolerance = 1e-8)
                     })
                   }
@@ -83,6 +98,7 @@ local({
 })
 
 local({
+  set.seed(1)
   y <- matrix(rnbinom(n = 1e4 * 4, mu = 5, size = 1 / 0.7), nrow = 4)
   annot <- data.frame(cont1 = runif(1e4))
   mm <- handle_design_parameter(~cont1, y, annot, NULL)$model_matrix
@@ -111,16 +127,18 @@ local({
 })
 
 
-for (fn in c("predict", "residuals")) {
-  local({
-    Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
-    rownames(Y) <- sprintf("gene_%s", seq_len(nrow(Y)))
-    colnames(Y) <- sprintf("cell_%s", seq_len(ncol(Y)))
+local({
+  set.seed(1)
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  rownames(Y) <- sprintf("gene_%s", seq_len(nrow(Y)))
+  colnames(Y) <- sprintf("cell_%s", seq_len(ncol(Y)))
 
-    annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-    design <- ~ group + cont1 + cont2
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  design <- ~ group + cont1 + cont2
 
-    res <- glm_gp(Y, design = design, col_data = annot)
+  res <- glm_gp(Y, design = design, col_data = annot)
+
+  for (fn in c("predict", "residuals")) {
     fn.type <- get(sprintf("%s.%s", fn, class(res)))
 
     for (pred.type in as.list(eval(formals(fn.type)[["type"]]))) {
@@ -157,5 +175,5 @@ for (fn in c("predict", "residuals")) {
         )
       })
     }
-  })
-}
+  }
+})
