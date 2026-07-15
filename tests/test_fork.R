@@ -156,13 +156,13 @@ diff.dt <- function(ref, fork, drop.na = FALSE) {
       melt(
         setnames(as.data.table(ref.de), old = "name", new = "gene"),
         id.vars = "gene",
-        measure.vars = c("adj_pval", "f_statistic", "lfc"),
+        measure.vars = c("adj_pval", "f_statistic", "lfc", "pval"),
         value.name = "value.glmGamPoi"
       )[
         melt(
           setnames(as.data.table(fork.de), old = "name", new = "gene"),
           id.vars = "gene",
-          measure.vars = c("adj_pval", "f_statistic", "lfc"),
+          measure.vars = c("adj_pval", "f_statistic", "lfc", "pval"),
           value.name = "value.glmGamPoi2"
         ),
         on = .(gene, variable)
