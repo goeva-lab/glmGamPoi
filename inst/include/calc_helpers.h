@@ -7,12 +7,14 @@ const double SQRT_DBL_EPS = std::sqrt(DBL_EPSILON);
 
 #include <Eigen/Dense>
 template <class D> using EMB = Eigen::MatrixBase<D>;
+const double C_MU_MULT_LO = 1e-50;
+const double C_MU_MULT_HI = 1e50;
 
 template <class D4, class D1, class D2, class D3>
 inline D4 calculate_mu_mult(const EMB<D1> &model_matrix, const EMB<D2> &beta_hat, const EMB<D3> &exp_off) {
   return ((model_matrix * beta_hat).array().exp() * exp_off.array()).unaryExpr([](double exp_x) {
     // clamp to avoid large / zero values
-    return std::clamp(exp_x, 1e-50, 1e50);
+    return std::clamp(exp_x, C_MU_MULT_LO, C_MU_MULT_HI);
   });
 }
 
