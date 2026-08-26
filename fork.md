@@ -5,9 +5,22 @@ code in this repo after commit [`8d9a005`](https://github.com/goeva-lab/glmGamPo
 an explicit aim of this project has been to allow for upstream-ing of the relevant code into the upstream ([`const-ae/glmGamPoi`](https://github.com/const-ae/glmGamPoi)) repo.
 
 > [!IMPORTANT]
-> to allow for easier testing / comparison against the original package to catch regressions, the package & main exported class have been renamed to `glmGamPoi2`.
+> to allow for easier testing / comparison against the original package to catch regressions,
+> the package & main exported class have been renamed to `glmGamPoi2`.
 > this change is intended to be temporary and to be reverted should we merge into upstream.
-> moreover, the `R CMD CHECK` workflow for the repository has been disabled
+
+## installing the fork
+
+this fork can be installed as follows (using [`pak`](https://pak.r-lib.org)):
+
+```R
+withr::with_options(
+  list(pkg.git_submodules = TRUE), 
+  pak::pak("git::https://github.com/goeva-lab/glmGamPoi.git@perf_optim_eigen")
+)
+```
+
+the `pkg.git_submodules` setting override is necessary since this fork vendors [`LBFGSpp`](https://github.com/yixuan/LBFGSpp/) as a git submodule, which aren't loaded by `pak` by default.
 
 ## user-facing changes
 
