@@ -1,4 +1,3 @@
-
 #' Extract Residuals of Gamma Poisson Model
 #'
 #' @param object a fit of type `glmGamPoi`. It is usually produced with a call to
@@ -31,80 +30,83 @@
 #' @seealso [glm_gp()] and `stats::residuals.glm()
 #' @export
 residuals.glmGamPoi2 <- function(
-  object, type = c("deviance", "pearson", "randomized_quantile", "working", "response"),
-  feat.sub = NULL, obs.sub = NULL,
+  object,
+  type = c("deviance", "pearson", "randomized_quantile", "working", "response"),
+  feat.sub = NULL,
+  obs.sub = NULL,
   ...
 ) {
   type <- match.arg(type, c("deviance", "pearson", "randomized_quantile", "working", "response"))
   Y <- assay(object$data)
   if (type == "randomized_quantile") {
-    if(!is.null(feat.sub)) {
+    if (!is.null(feat.sub)) {
       feat.sub <- NULL
       warning("feat.sub argument is not supported when type is randomized_quantile, ignoring it.")
     }
-    if(!is.null(obs.sub)) {
+    if (!is.null(obs.sub)) {
       obs.sub <- NULL
       warning("obs.sub argument is not supported when type is randomized_quantile, ignoring it.")
     }
   }
 
-  if(!is.null(feat.sub)) {
+  if (!is.null(feat.sub)) {
     feat.sub <- handle_sub_param(rownames(object$data), feat.sub)
-    Y <- Y[feat.sub, , drop=FALSE]
+    Y <- Y[feat.sub, , drop = FALSE]
     object$overdispersions <- object$overdispersions[feat.sub]
   }
-  if(!is.null(obs.sub)) {
+  if (!is.null(obs.sub)) {
     obs.sub <- handle_sub_param(colnames(object$data), obs.sub)
-    Y <- Y[, obs.sub, drop=FALSE]
+    Y <- Y[, obs.sub, drop = FALSE]
   }
   if (is.function(object$Mu)) {
     object$Mu <- object$Mu(obs = obs.sub, feat = feat.sub)
   } else {
     if (!is.null(feat.sub)) {
-      object$Mu <- object$Mu[feat.sub, , drop=FALSE]
+      object$Mu <- object$Mu[feat.sub, , drop = FALSE]
     }
     if (!is.null(obs.sub)) {
-      object$Mu <- object$Mu[, obs.sub, drop=FALSE]
+      object$Mu <- object$Mu[, obs.sub, drop = FALSE]
     }
   }
 
   make_resid_hdf5_mat <- is_on_disk.glmGamPoi2(object)
-  if(!make_resid_hdf5_mat && is(Y, "sparseMatrix")) { # densify matrix if currently sparse (residuals are dense anyways)
+  if (!make_resid_hdf5_mat && is(Y, "sparseMatrix")) {
+    # densify matrix if currently sparse (residuals are dense anyways)
     Y <- as.matrix(Y)
   }
-  ret <- if(type == "deviance"){
-    if(! make_resid_hdf5_mat){
+  ret <- if (type == "deviance") {
+    if (!make_resid_hdf5_mat) {
       compute_gp_deviance_residuals_matrix(Y, object$Mu, object$overdispersions)
-    }else{
+    } else {
       delayed_matrix_apply_block(Y, object$Mu, object$overdispersions, compute_gp_deviance_residuals_matrix)
     }
-  }else if(type == "pearson"){
-    if(! make_resid_hdf5_mat){
+  } else if (type == "pearson") {
+    if (!make_resid_hdf5_mat) {
       div_zbz_dbl_mat(Y - object$Mu, sqrt(object$Mu + multiply_vector_to_each_column(object$Mu^2, object$overdispersions)))
-    }else{
-      delayed_matrix_apply_block(Y, object$Mu, object$overdispersions, function(.Y, .Mu, .disp){
+    } else {
+      delayed_matrix_apply_block(Y, object$Mu, object$overdispersions, function(.Y, .Mu, .disp) {
         div_zbz_dbl_mat(.Y - .Mu, sqrt(.Mu + multiply_vector_to_each_column(.Mu^2, .disp)))
       })
     }
-  }else if(type == "randomized_quantile"){
-    if(! make_resid_hdf5_mat){
+  } else if (type == "randomized_quantile") {
+    if (!make_resid_hdf5_mat) {
       qres.gampoi(Y, object$Mu, object$overdispersions)
-    }else{
+    } else {
       delayed_matrix_apply_block(Y, object$Mu, object$overdispersions, qres.gampoi)
     }
-  }else if(type == "working"){
-    if(! make_resid_hdf5_mat){
+  } else if (type == "working") {
+    if (!make_resid_hdf5_mat) {
       div_zbz_dbl_mat(Y - object$Mu, object$Mu)
-    }else{
-      delayed_matrix_apply_block(Y, object$Mu, object$overdispersions, function(.Y, .Mu, .disp){
+    } else {
+      delayed_matrix_apply_block(Y, object$Mu, object$overdispersions, function(.Y, .Mu, .disp) {
         div_zbz_dbl_mat(.Y - .Mu, .Mu)
       })
     }
-  }else if(type == "response"){
+  } else if (type == "response") {
     res <- Y - object$Mu
-    if(! make_resid_hdf5_mat){
+    if (!make_resid_hdf5_mat) {
       res
-    }else{
+    } else {
       HDF5Array::writeHDF5Array(res)
     }
   }
@@ -114,28 +116,27 @@ residuals.glmGamPoi2 <- function(
 }
 
 
-qres.gampoi <- function(Y, Mu, dispersion){
-  tmp <- vapply(seq_len(ncol(Y)), function(idx){
-    a <- pnbinom(Y[, idx] - 1, mu = Mu[, idx], size = 1/dispersion)
-    b <- pnbinom(Y[, idx], mu = Mu[, idx], size = 1/dispersion)
-    rbind(a, b)
-  }, FUN.VALUE = matrix(0, ncol = nrow(Y), nrow = 2))
+qres.gampoi <- function(Y, Mu, dispersion) {
+  tmp <- vapply(
+    seq_len(ncol(Y)),
+    function(idx) {
+      a <- pnbinom(Y[, idx] - 1, mu = Mu[, idx], size = 1 / dispersion)
+      b <- pnbinom(Y[, idx], mu = Mu[, idx], size = 1 / dispersion)
+      rbind(a, b)
+    },
+    FUN.VALUE = matrix(0, ncol = nrow(Y), nrow = 2)
+  )
 
-  u <- runif(n = length(Y), min = pmin(tmp[1,,], tmp[2,,]), max = pmax(tmp[1,,], tmp[2,,]))
+  u <- runif(n = length(Y), min = pmin(tmp[1, , ], tmp[2, , ]), max = pmax(tmp[1, , ], tmp[2, , ]))
   res <- qnorm(u)
 
   # Get rid of infinite value by sampling on the log scale
   # This is technically wrong, but shouldn't matter.
   inf_res <- which(is.infinite(res))
-  a_alt <- pnbinom(Y[inf_res] - 1, mu = Mu[inf_res], size = 1/dispersion[(inf_res - 1) %% nrow(Y) + 1],
-                   log.p = TRUE, lower.tail = Mu[inf_res] > Y[inf_res])
-  b_alt <- pnbinom(Y[inf_res], mu = Mu[inf_res], size = 1/dispersion[(inf_res - 1) %% nrow(Y) + 1],
-                   log.p = TRUE, lower.tail = Mu[inf_res] > Y[inf_res])
+  a_alt <- pnbinom(Y[inf_res] - 1, mu = Mu[inf_res], size = 1 / dispersion[(inf_res - 1) %% nrow(Y) + 1], log.p = TRUE, lower.tail = Mu[inf_res] > Y[inf_res])
+  b_alt <- pnbinom(Y[inf_res], mu = Mu[inf_res], size = 1 / dispersion[(inf_res - 1) %% nrow(Y) + 1], log.p = TRUE, lower.tail = Mu[inf_res] > Y[inf_res])
   u_alt <- runif(n = length(inf_res), min = pmin(a_alt, b_alt), max = pmax(a_alt, b_alt))
   res[inf_res] <- qnorm(u_alt, log.p = TRUE, lower.tail = Mu[inf_res] > Y[inf_res])
 
   array(res, dim(Y))
 }
-
-
-

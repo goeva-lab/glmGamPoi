@@ -1,7 +1,6 @@
 skip("Printing tests should be run interactively")
 
 test_that("summary of matrix looks good", {
-
   mat <- matrix(1:32, nrow = 8, ncol = 4)
   cat(format_matrix(mat))
   colnames(mat) <- LETTERS[1:4]
@@ -12,7 +11,6 @@ test_that("summary of matrix looks good", {
   colnames(mat) <- LETTERS[1:4]
   cat(format_matrix(mat))
 
-
   mat <- matrix(numeric(0), nrow = 0, ncol = 4)
   cat(format_matrix(mat))
   colnames(mat) <- LETTERS[1:4]
@@ -22,19 +20,15 @@ test_that("summary of matrix looks good", {
   cat(format_matrix(mat))
   rownames(mat) <- LETTERS[1:4]
   cat(format_matrix(mat))
-
-
 })
 
 
 test_that("summary of matrix can handle NAs", {
-
   mat <- matrix(1:32, nrow = 8, ncol = 4)
   mat[1, 1] <- NA
   cat(format_matrix(my_matrix_summary(mat)))
   colnames(mat) <- LETTERS[1:4]
   cat(format_matrix(my_matrix_summary(mat)))
-
 })
 
 
@@ -44,7 +38,7 @@ test_that("fit printing works", {
   print(fit)
   print(summary(fit))
 
-  fit <- glm_gp(mat[1:3, ,drop=FALSE], size_factors = FALSE)
+  fit <- glm_gp(mat[1:3, , drop = FALSE], size_factors = FALSE)
   print(fit)
   print(summary(fit))
 
@@ -57,7 +51,6 @@ test_that("fit printing works", {
   fit <- glm_gp(mat[1:3, ], design = model_matrix[, 1:2])
   print(fit)
   print(summary(fit))
-
 })
 
 
@@ -68,5 +61,3 @@ test_that("fit printing can handle DelayedArrays", {
   print(fit)
   print(summary(fit))
 })
-
-

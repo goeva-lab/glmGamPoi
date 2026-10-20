@@ -163,7 +163,7 @@ overdispersion_mle_impl <- function(y, mu, model_matrix, do_cox_reid_adjustment,
 
 
 conventional_overdispersion_mle <- function(y, mu_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 200, use_nr_overdisp_impl = FALSE) {
-  if(use_nr_overdisp_impl) {
+  if (use_nr_overdisp_impl) {
     return(NR_overdispersion_mle(y, mu_vector, model_matrix, do_cox_reid_adjustment, max_iter))
   }
   return_value <- list(estimate = NA_real_, iterations = NA_real_, message = "")

@@ -1,4 +1,3 @@
-
 #' Create a 'SingleCellExperiment' containing pseudo-bulk samples
 #'
 #' @param data a 'SingleCellExperiment' or an object of a related class
@@ -33,51 +32,51 @@
 #'  colData(aggr_sce)
 #'
 #' @export
-pseudobulk <- function(data, group_by, ...,
-                       aggregation_functions = list(counts = "rowSums2", .default = "rowMeans2"),
-                       col_data = NULL, make_colnames = TRUE, verbose = TRUE){
-
+pseudobulk <- function(data, group_by, ..., aggregation_functions = list(counts = "rowSums2", .default = "rowMeans2"), col_data = NULL, make_colnames = TRUE, verbose = TRUE) {
   col_data <- get_col_data(data, col_data)
-  if(is.matrix(data)){
-    if(any((data %% 1) > 1e-10)){
+  if (is.matrix(data)) {
+    if (any((data %% 1) > 1e-10)) {
       warning("'data' is treated as a count matrix even though it contains non-integer values.")
     }
     data <- SummarizedExperiment::SummarizedExperiment(list(counts = data), colData = col_data)
   }
 
-  if(missing(group_by)) stop("The 'group_by' must not be missing.")
-  tryCatch({
-    if(inherits(group_by, "uneval") || !rlang::is_quosures(group_by)) stop("The 'group_by' argument must be wrapped using 'vars()'")
-  }, error = function(e){
-    stop(e, "\n", "The 'group_by' argument must be wrapped using 'vars()'")
-  })
+  if (missing(group_by)) {
+    stop("The 'group_by' must not be missing.")
+  }
+  tryCatch(
+    {
+      if (inherits(group_by, "uneval") || !rlang::is_quosures(group_by)) stop("The 'group_by' argument must be wrapped using 'vars()'")
+    },
+    error = function(e) {
+      stop(e, "\n", "The 'group_by' argument must be wrapped using 'vars()'")
+    }
+  )
 
   index_seq <- seq_len(ncol(data))
-  if(! ".default" %in% names(aggregation_functions)){
+  if (!".default" %in% names(aggregation_functions)) {
     aggregation_functions$.default <- "rowMeans"
   }
 
   # Make vector that is used to
   groups <- lapply(group_by, rlang::eval_tidy, data = col_data)
   group_lengths <- vctrs::list_sizes(groups)
-  if(! all(group_lengths == 1 | group_lengths == ncol(data))){
-    stop("The argument 'group_by' has lengths ", paste0(group_lengths, collapse = ","), ", which does not match the number of columns ",
-         "in 'data' (", ncol(data), ")")
-  }else if(any(group_lengths == 1)){
+  if (!all(group_lengths == 1 | group_lengths == ncol(data))) {
+    stop("The argument 'group_by' has lengths ", paste0(group_lengths, collapse = ","), ", which does not match the number of columns ", "in 'data' (", ncol(data), ")")
+  } else if (any(group_lengths == 1)) {
     groups[group_lengths == 1] <- lapply(groups[group_lengths == 1], \(x) rep_len(x, ncol(data)))
   }
 
-  if(is.null(groups)){
+  if (is.null(groups)) {
     stop("'group_by' must not be 'NULL'.")
-  }else{
+  } else {
     split_res <- vctrs::vec_group_loc(as.data.frame(groups))
     group_split <- split_res$loc
-    if(make_colnames){
+    if (make_colnames) {
       split_res_key <- split_res$key
       row_names <- character(nrow(split_res_key))
-      for(idx in seq_len(nrow(split_res_key))){
-        row_names[idx] <- paste0(vapply(split_res_key[idx,,drop=FALSE], function(x) paste0(as.character(x), collapse = "."), FUN.VALUE = character(1L)),
-                                 collapse = ".")
+      for (idx in seq_len(nrow(split_res_key))) {
+        row_names[idx] <- paste0(vapply(split_res_key[idx, , drop = FALSE], function(x) paste0(as.character(x), collapse = "."), FUN.VALUE = character(1L)), collapse = ".")
       }
       names(group_split) <- row_names
     }
@@ -85,126 +84,146 @@ pseudobulk <- function(data, group_by, ...,
 
   # Aggregate all assays
   assay_names <- SummarizedExperiment::assayNames(data)
-  if(is.null(assay_names)){
+  if (is.null(assay_names)) {
     assay_names <- seq_len(length(SummarizedExperiment::assays(data)))
   }
-  new_assays <- lapply(assay_names, function(assay_name){
+  new_assays <- lapply(assay_names, function(assay_name) {
     aggr_fnc_res <- get_aggregation_function(assay_name, aggregation_functions)
     aggr_fnc <- aggr_fnc_res$fnc
-    if(verbose) message("Aggregating assay '", assay_name, "' using '", aggr_fnc_res$label, "'.")
+    if (verbose) {
+      message("Aggregating assay '", assay_name, "' using '", aggr_fnc_res$label, "'.")
+    }
     data_mat <- SummarizedExperiment::assay(data, assay_name)
-    new_data_mat <- do.call(cbind, lapply(group_split, function(idx){
-      if(aggr_fnc_res$smart_subset){
-        # This optimization needs sparseMatrixStats >= 1.17.1 to be effective
-        aggr_fnc(data_mat, cols = idx)
-      }else{
-        aggr_fnc(data_mat[,idx,drop=FALSE])
-      }
-    }))
+    new_data_mat <- do.call(
+      cbind,
+      lapply(group_split, function(idx) {
+        if (aggr_fnc_res$smart_subset) {
+          # This optimization needs sparseMatrixStats >= 1.17.1 to be effective
+          aggr_fnc(data_mat, cols = idx)
+        } else {
+          aggr_fnc(data_mat[, idx, drop = FALSE])
+        }
+      })
+    )
     rownames(new_data_mat) <- rownames(data)
     new_data_mat
   })
-  if(! is.null(SummarizedExperiment::assayNames(data))){
+  if (!is.null(SummarizedExperiment::assayNames(data))) {
     names(new_assays) <- assay_names
   }
 
   # Aggregate reduced dims
-  if(is(data, "SingleCellExperiment")){
+  if (is(data, "SingleCellExperiment")) {
     red_assay_names <- SingleCellExperiment::reducedDimNames(data)
-    if(is.null(red_assay_names)){
+    if (is.null(red_assay_names)) {
       red_assay_names <- seq_len(length(SingleCellExperiment::reducedDims(data)))
     }
-    new_red_dims <- lapply(red_assay_names, function(red_name){
+    new_red_dims <- lapply(red_assay_names, function(red_name) {
       aggr_fnc_res <- get_aggregation_function(red_name, aggregation_functions)
       aggr_fnc <- aggr_fnc_res$fnc
-      if(verbose) message("Aggregating reducedDim '", red_name, "' using '", aggr_fnc_res$label, "'.")
+      if (verbose) {
+        message("Aggregating reducedDim '", red_name, "' using '", aggr_fnc_res$label, "'.")
+      }
       tdata_mat <- SingleCellExperiment::reducedDim(data, red_name)
-      if(is(tdata_mat, "LinearEmbeddingMatrix")){
+      if (is(tdata_mat, "LinearEmbeddingMatrix")) {
         data_mat <- t(SingleCellExperiment::sampleFactors(tdata_mat))
-        new_data_mat <- do.call(cbind, lapply(group_split, function(idx){
-          if(aggr_fnc_res$smart_subset){
-            aggr_fnc(data_mat, cols = idx)
-          }else{
-            aggr_fnc(data_mat[,idx,drop=FALSE])
-          }
-        }))
-        SingleCellExperiment::LinearEmbeddingMatrix(t(new_data_mat), SingleCellExperiment::featureLoadings(tdata_mat),
-                                                    factorData = SingleCellExperiment::factorData(tdata_mat))
-      }else{
+        new_data_mat <- do.call(
+          cbind,
+          lapply(group_split, function(idx) {
+            if (aggr_fnc_res$smart_subset) {
+              aggr_fnc(data_mat, cols = idx)
+            } else {
+              aggr_fnc(data_mat[, idx, drop = FALSE])
+            }
+          })
+        )
+        SingleCellExperiment::LinearEmbeddingMatrix(t(new_data_mat), SingleCellExperiment::featureLoadings(tdata_mat), factorData = SingleCellExperiment::factorData(tdata_mat))
+      } else {
         data_mat <- t(tdata_mat)
-        new_data_mat <- do.call(cbind, lapply(group_split, function(idx){
-          aggr_fnc(data_mat[,idx,drop=FALSE])
-        }))
+        new_data_mat <- do.call(
+          cbind,
+          lapply(group_split, function(idx) {
+            aggr_fnc(data_mat[, idx, drop = FALSE])
+          })
+        )
         rownames(new_data_mat) <- rownames(data_mat)
         t(new_data_mat)
       }
     })
-    if(! is.null(SingleCellExperiment::reducedDimNames(data))){
+    if (!is.null(SingleCellExperiment::reducedDimNames(data))) {
       names(new_red_dims) <- red_assay_names
     }
-  }else{
+  } else {
     new_red_dims <- NULL
   }
 
   # Aggregate column data
   dots_cap <- rlang::enquos(...)
-  new_col_data <- lapply(seq_along(dots_cap), function(dot_idx){
+  new_col_data <- lapply(seq_along(dots_cap), function(dot_idx) {
     dot <- dots_cap[[dot_idx]]
     dot_name <- names(dots_cap)[dot_idx]
-    if(is.null(dot_name) || dot_name == ""){
+    if (is.null(dot_name) || dot_name == "") {
       dot_name <- rlang::as_label(dot)
     }
 
-    unname(do.call(c, lapply(group_split, function(idx){
-      functions <- rlang::new_environment(list(n = function(){length(idx)}))
-      mask <- rlang::new_data_mask(bottom = rlang::new_environment(col_data[idx,,drop=FALSE], parent = functions), top = functions)
-      mask$.fns <- rlang::as_data_pronoun(functions)
-      mask$.data <- rlang::as_data_pronoun(mask)
-      res <- rlang::eval_tidy(dot, data = mask)
-      if(length(res) != 1) stop("Illegal result in aggregation of '", dot_name,
-                                "'. The aggregated value has to be of length 1. However, it has length ", length(res))
-      res
-    })))
+    unname(do.call(
+      c,
+      lapply(group_split, function(idx) {
+        functions <- rlang::new_environment(list(n = function() {
+          length(idx)
+        }))
+        mask <- rlang::new_data_mask(bottom = rlang::new_environment(col_data[idx, , drop = FALSE], parent = functions), top = functions)
+        mask$.fns <- rlang::as_data_pronoun(functions)
+        mask$.data <- rlang::as_data_pronoun(mask)
+        res <- rlang::eval_tidy(dot, data = mask)
+        if (length(res) != 1) {
+          stop("Illegal result in aggregation of '", dot_name, "'. The aggregated value has to be of length 1. However, it has length ", length(res))
+        }
+        res
+      })
+    ))
   })
-  if(is.null(names(dots_cap))){
+  if (is.null(names(dots_cap))) {
     names(new_col_data) <- vapply(dots_cap, rlang::as_label, FUN.VALUE = character(1L))
-  }else{
+  } else {
     names(new_col_data) <- names(dots_cap)
   }
   names(new_col_data)[names(new_col_data) == ""] <- vapply(dots_cap[names(new_col_data) == ""], rlang::as_label, FUN.VALUE = character(1L))
 
   # Make id columns
   id_columns <- split_res$key
-  names(id_columns) <-  vapply(seq_along(group_by), \(idx){
-    id_name <- names(group_by)[idx]
-    if(is.null(id_name) || id_name == ""){
-      id_name <- rlang::as_label(group_by[[idx]])
-    }
-    id_name
-  }, FUN.VALUE = character(1L))
+  names(id_columns) <- vapply(
+    seq_along(group_by),
+    \(idx) {
+      id_name <- names(group_by)[idx]
+      if (is.null(id_name) || id_name == "") {
+        id_name <- rlang::as_label(group_by[[idx]])
+      }
+      id_name
+    },
+    FUN.VALUE = character(1L)
+  )
   new_col_data <- c(id_columns, new_col_data)
 
-  SingleCellExperiment::SingleCellExperiment(new_assays, colData = new_col_data,
-                                             reducedDims = new_red_dims,
-                                             rowData = SummarizedExperiment::rowData(data))
+  SingleCellExperiment::SingleCellExperiment(new_assays, colData = new_col_data, reducedDims = new_red_dims, rowData = SummarizedExperiment::rowData(data))
 }
 
-get_aggregation_function <- function(assay_name, aggregation_functions){
-  aggr_fnc <- if(assay_name %in% names(aggregation_functions)){
+get_aggregation_function <- function(assay_name, aggregation_functions) {
+  aggr_fnc <- if (assay_name %in% names(aggregation_functions)) {
     aggregation_functions[[assay_name]]
-  }else{
+  } else {
     aggregation_functions[[".default"]]
   }
-  if(is.character(aggr_fnc)){
+  if (is.character(aggr_fnc)) {
     label <- aggr_fnc
-    aggr_fnc <- if(aggr_fnc == "rowSums2"){
+    aggr_fnc <- if (aggr_fnc == "rowSums2") {
       MatrixGenerics::rowSums2
-    }else if(aggr_fnc == "rowMeans2"){
+    } else if (aggr_fnc == "rowMeans2") {
       MatrixGenerics::rowMeans2
-    }else{
-      get(aggr_fnc, envir =  globalenv(), mode = "function")
+    } else {
+      get(aggr_fnc, envir = globalenv(), mode = "function")
     }
-  }else{
+  } else {
     label <- "custom function"
   }
   smart_subset <- "cols" %in% names(formals(aggr_fnc))
@@ -218,7 +237,6 @@ get_aggregation_function <- function(assay_name, aggregation_functions){
 #' @seealso ggplot2::vars, dplyr::vars
 #'
 #' @export
-vars <- function(...){
+vars <- function(...) {
   rlang::quos(...)
 }
-
