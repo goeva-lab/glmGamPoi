@@ -61,7 +61,7 @@ format.glmGamPoi2 <- function(x, ...){
 #' @export
 summary.glmGamPoi2 <- function(object, ...){
   ans <- object
-  class(ans) <- "summary.glmGamPoi"
+  class(ans) <- "summary.glmGamPoi2"
   ans
 }
 

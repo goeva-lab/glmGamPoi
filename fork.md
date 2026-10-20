@@ -68,7 +68,7 @@ internally, these changes have required relatively significant changes to packag
 
 a test suite for relevant changes has also been added at [`test-perf_optim.R`](./tests/testthat/test-perf_optim.R).
 
-moreover, a file to drive benchmarking / regression analysis is provided at [`test_fork.R`](./tests/test_fork.R).
+moreover, a file to drive benchmarking / regression analysis is provided at [`test_fork.R`](./tools/test_fork.R).
 it will most likely be deleted and maybe moved to a separate repo prior to upstreaming.
 
 ## miscleanea
@@ -85,7 +85,7 @@ other notable experiments were undertaken before being dismissed as non worthwhi
 
 ### singularity definition file
 
-for easier benchmarking and evaluation, a singularity definition file [`./glmgp.def`](./glmgp.def) has been made.
+for easier benchmarking and evaluation, a singularity definition file [`./glmgp.def`](./tools/glmgp.def) has been made.
 it generates an environment w/ both forked (under the `glmGamPoi2` name) original (as fetched from bioconductor) packages available.
 
 the build instructions are tuned to generate maximally-optimized builds (i.e. `-O3`) and leveraging all available CPU instructions available (i.e. `-march=native`).
