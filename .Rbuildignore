@@ -3,3 +3,7 @@
 ^README\.Rmd$
 tmp_scripts
 .github
+
+^air.toml$
+^jarl.toml$
+^.lintr.R$

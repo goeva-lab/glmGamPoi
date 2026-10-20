@@ -1,3 +1,6 @@
+Version 1.26.0 (???)
++ `glmgp` now has a `perf_optim` argument which allows enabling various performance optimizations
+
 Version 1.19 (2024-11-26)
 + glmGamPoi is using the new tatami library instead of the old beachmat interface.
 These libraries helped to work with different kind of matrices (dense, HDF5-backed).

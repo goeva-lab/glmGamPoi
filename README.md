@@ -1,22 +1,14 @@
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
-# glmGamPoi <a href='https://github.com/const-ae/glmGamPoi'><img src='man/figures/logo.svg' align="right" height="139" /></a>
-
-<!-- badges: start -->
-
-[![codecov](https://codecov.io/gh/const-ae/glmGamPoi/branch/master/graph/badge.svg)](https://codecov.io/gh/const-ae/glmGamPoi)
-<!-- badges: end -->
+# glmGamPoi <img src="./man/figures/logo.svg" alt="logo" height="128" align="right"/>
 
 > Fit Gamma-Poisson Generalized Linear Models Reliably.
-
->[!IMPORTANT]
+\
+> [!IMPORTANT]
 > this repo is a fork of upstream [glmGamPoi](https://github.com/const-ae/glmGamPoi).
 > it is specifically designed to optimize memory use and runtime, without sacrificing the library's existing accuracy or features.
 > more details regarding using the fork, its scope, and relevant modifications are discussed in [fork.md](./fork.md).
 
-Pronounciation:
-[`dʒi əl əm ɡam ˈpwɑ`](http://ipa-reader.com/?text=d%CA%92i%20%C9%99l%20%C9%99m%20%C9%A1am%20%CB%88pw%C9%91)
+Pronounciation: [`dʒi əl əm ɡam ˈpwɑ`](http://ipa-reader.com/?text=d%CA%92i%20%C9%99l%20%C9%99m%20%C9%A1am%20%CB%88pw%C9%91)
 
 The core design aims of `glmGamPoi` are:
 
@@ -29,7 +21,7 @@ The core design aims of `glmGamPoi` are:
 - Avoid unnecessary dependencies
 - Make integration into other tools easy
 
-# Installation
+## Installation
 
 You can install the release version of
 *[glmGamPoi](https://bioconductor.org/packages/glmGamPoi)* from
@@ -53,7 +45,7 @@ If you use this package in a scientific publication, please cite:
 > Bioinformatics; 2020-12-09; doi:
 > <https://doi.org/10.1093/bioinformatics/btaa1009>
 
-# Example
+## Example
 
 Load the glmGamPoi package
 
@@ -70,18 +62,9 @@ counts <- rnbinom(n = 10, mu = 5, size = 1/0.7)
 # design = ~ 1 means that an intercept-only model is fit
 fit <- glm_gp(counts, design = ~ 1)
 fit
-#> glmGamPoiFit object:
-#> The data had 1 rows and 10 columns.
-#> A model with 1 coefficient was fitted.
 
 # Internally fit is just a list:
 as.list(fit)[1:2]
-#> $Beta
-#>      Intercept
-#> [1,]  1.504077
-#> 
-#> $overdispersions
-#> [1] 0.3792855
 ```
 
 The `glm_gp()` function returns a list with the results of the fit. Most
@@ -106,26 +89,11 @@ library(DelayedMatrixStats)
 # The full dataset with 33,000 genes and 4340 cells
 # The first time this is run, it will download the data
 pbmcs <- TENxPBMCData::TENxPBMCData("pbmc4k")
-#> snapshotDate(): 2022-10-31
-#> see ?TENxPBMCData and browseVignettes('TENxPBMCData') for documentation
-#> loading from cache
 
 # I want genes where at least some counts are non-zero
 non_empty_rows <- which(rowSums2(assay(pbmcs)) > 0)
 pbmcs_subset <- pbmcs[sample(non_empty_rows, 300), ]
 pbmcs_subset
-#> class: SingleCellExperiment 
-#> dim: 300 4340 
-#> metadata(0):
-#> assays(1): counts
-#> rownames(300): ENSG00000126457 ENSG00000109832 ... ENSG00000143819
-#>   ENSG00000188243
-#> rowData names(3): ENSEMBL_ID Symbol_TENx Symbol
-#> colnames: NULL
-#> colData names(11): Sample Barcode ... Individual Date_published
-#> reducedDimNames(0):
-#> mainExpName: NULL
-#> altExpNames(0):
 ```
 
 I call `glm_gp()` to fit one GLM model for each gene and force the
@@ -134,41 +102,13 @@ calculation to happen in memory.
 ``` r
 fit <- glm_gp(pbmcs_subset, on_disk = FALSE)
 summary(fit)
-#> glmGamPoiFit object:
-#> The data had 300 rows and 4340 columns.
-#> A model with 1 coefficient was fitted.
-#> The design formula is: Y~1
-#> 
-#> Beta:
-#>             Min 1st Qu. Median 3rd Qu.   Max
-#> Intercept -8.51   -6.57  -3.91   -2.59 0.903
-#> 
-#> deviance:
-#>  Min 1st Qu. Median 3rd Qu.  Max
-#>   14    86.8    657    1686 5507
-#> 
-#> overdispersion:
-#>  Min  1st Qu. Median 3rd Qu.   Max
-#>    0 1.65e-13  0.288    1.84 24687
-#> 
-#> Shrunken quasi-likelihood overdispersion:
-#>    Min 1st Qu. Median 3rd Qu.  Max
-#>  0.707   0.991      1    1.04 7.45
-#> 
-#> size_factors:
-#>    Min 1st Qu. Median 3rd Qu.  Max
-#>  0.117   0.738   1.01    1.32 14.5
-#> 
-#> Mu:
-#>       Min 1st Qu. Median 3rd Qu.  Max
-#>  2.34e-05 0.00142 0.0185  0.0779 35.8
 ```
 
-# Benchmark
+## Benchmark
 
 I compare my method (in-memory and on-disk) with
-*[DESeq2](https://bioconductor.org/packages/3.16/DESeq2)* and
-*[edgeR](https://bioconductor.org/packages/3.16/edgeR)*. Both are
+*[DESeq2](https://bioconductor.org/packages/release/DESeq2)* and
+*[edgeR](https://bioconductor.org/packages/release/edgeR)*. Both are
 classical methods for analyzing RNA-Seq datasets and have been around
 for almost 10 years. Note that both tools can do a lot more than just
 fitting the Gamma-Poisson model, so this benchmark only serves to give a
@@ -199,13 +139,6 @@ bench::mark(
     edgeR_fit <- edgeR::glmFit(edgeR_data, design = model_matrix)
   }, check = FALSE, min_iterations = 3
 )
-#> # A tibble: 4 × 6
-#>   expression               min   median `itr/sec` mem_alloc `gc/sec`
-#>   <bch:expr>          <bch:tm> <bch:tm>     <dbl> <bch:byt>    <dbl>
-#> 1 glmGamPoi_in_memory    1.32s    1.36s    0.640   533.47MB    2.13 
-#> 2 glmGamPoi_on_disk      4.82s    5.03s    0.200   851.78MB    1.20 
-#> 3 DESeq2                22.07s      23s    0.0440    1.05GB    0.352
-#> 4 edgeR                  5.69s    5.81s    0.172   792.91MB    0.804
 ```
 
 On this dataset, `glmGamPoi` is more than 5 times faster than `edgeR`
@@ -239,8 +172,6 @@ edgeR_data <- edgeR::estimateDisp(edgeR_data, model_matrix)
 edgeR_fit <- edgeR::glmFit(edgeR_data, design = model_matrix)
 ```
 
-![](man/figures/README-coefficientComparison-1.png)<!-- -->
-
 I am comparing the gene-wise estimates of the coefficients from all
 three methods. Points on the diagonal line are identical. The inferred
 Beta coefficients and gene means agree well between the methods, however
@@ -271,24 +202,7 @@ and cell type (`cell`):
 
 ``` r
 sce <- muscData::Kang18_8vs8()
-#> snapshotDate(): 2022-10-31
-#> see ?muscData and browseVignettes('muscData') for documentation
-#> loading from cache
 colData(sce)
-#> DataFrame with 29065 rows and 5 columns
-#>                        ind     stim   cluster            cell multiplets
-#>                  <integer> <factor> <integer>        <factor>   <factor>
-#> AAACATACAATGCC-1       107     ctrl         5 CD4 T cells        doublet
-#> AAACATACATTTCC-1      1016     ctrl         9 CD14+ Monocytes    singlet
-#> AAACATACCAGAAA-1      1256     ctrl         9 CD14+ Monocytes    singlet
-#> AAACATACCAGCTA-1      1256     ctrl         9 CD14+ Monocytes    doublet
-#> AAACATACCATGCA-1      1488     ctrl         3 CD4 T cells        singlet
-#> ...                    ...      ...       ...             ...        ...
-#> TTTGCATGCTAAGC-1       107     stim         6     CD4 T cells    singlet
-#> TTTGCATGGGACGA-1      1488     stim         6     CD4 T cells    singlet
-#> TTTGCATGGTGAGG-1      1488     stim         6     CD4 T cells    ambs   
-#> TTTGCATGGTTTGG-1      1244     stim         6     CD4 T cells    ambs   
-#> TTTGCATGTCTTAC-1      1016     stim         5     CD4 T cells    singlet
 ```
 
 For demonstration purpose, I will work on a subset of the genes and
@@ -315,8 +229,6 @@ each cell.
 
 ``` r
 sce_reduced <- pseudobulk(sce_subset, group_by = vars(ind, stim, cell))
-#> Aggregating assay 'counts' using 'rowSums2'.
-#> Aggregating reducedDim 'TSNE' using 'rowMeans2'.
 ```
 
 We will identify which genes in CD4 positive T-cells are changed most by
@@ -328,37 +240,6 @@ specific responses to the treatment:
 fit <- glm_gp(sce_reduced, design = ~ cell + stim +  stim:cell - 1,
               reference_level = "NK cells")
 summary(fit)
-#> glmGamPoiFit object:
-#> The data had 9727 rows and 47 columns.
-#> A model with 6 coefficient was fitted.
-#> The design formula is: Y~cell + stim + stim:cell - 1
-#> 
-#> Beta:
-#>                    Min  1st Qu. Median 3rd Qu.  Max
-#>    cellNK cells -1e+08 -1.0e+08  -1.20  -0.107 6.94
-#>     cellB cells -1e+08 -1.0e+08  -1.36  -0.394 6.93
-#> cellCD4 T cells -1e+08 -2.6e+00  -1.62  -0.523 6.97
-#> ...
-#> 
-#> deviance:
-#>  Min 1st Qu. Median 3rd Qu.  Max
-#>    0    14.6   25.2    35.6 2567
-#> 
-#> overdispersion:
-#>  Min  1st Qu. Median 3rd Qu.  Max
-#>    0 1.86e-07 0.0882   0.532 60.8
-#> 
-#> Shrunken quasi-likelihood overdispersion:
-#>   Min 1st Qu. Median 3rd Qu. Max
-#>  0.33    1.02   1.04    1.12 229
-#> 
-#> size_factors:
-#>     Min 1st Qu. Median 3rd Qu.  Max
-#>  0.0448   0.511  0.963    1.83 10.5
-#> 
-#> Mu:
-#>  Min 1st Qu. Median 3rd Qu.   Max
-#>    0       0  0.218   0.832 11003
 ```
 
 To see how the coefficient of our model are called, we look at the
@@ -366,9 +247,6 @@ To see how the coefficient of our model are called, we look at the
 
 ``` r
 colnames(fit$Beta)
-#> [1] "cellNK cells"             "cellB cells"             
-#> [3] "cellCD4 T cells"          "stimstim"                
-#> [5] "cellB cells:stimstim"     "cellCD4 T cells:stimstim"
 ```
 
 In our example, we want to find the genes that change specifically in T
@@ -382,13 +260,6 @@ de_res <- test_de(fit, contrast = cond(cell = "CD4 T cells", stim = "ctrl") - co
 
 # Most different genes
 head(de_res[order(de_res$pval), ])
-#>       name         pval     adj_pval f_statistic df1      df2       lfc
-#> 189   IFI6 1.561865e-36 1.519226e-32    494.3754   1 82.25076 -5.295261
-#> 5181 IFIT3 1.941621e-33 9.443076e-30    402.8278   1 82.25076 -6.754418
-#> 5182 IFIT1 2.906395e-31 9.423503e-28    347.3425   1 82.25076 -5.530940
-#> 5    ISG15 2.494256e-29 6.065408e-26    303.3882   1 82.25076 -4.799133
-#> 4563  LY6E 3.606785e-27 6.454804e-24    259.5989   1 82.25076 -3.692098
-#> 7218 ISG20 3.981580e-27 6.454804e-24    258.7812   1 82.25076 -2.892739
 ```
 
 The test is successful and we identify interesting genes that are
@@ -402,17 +273,10 @@ p-values.
 
 ``` r
 library(ggplot2)
-#> 
-#> Attaching package: 'ggplot2'
-#> The following object is masked from 'package:glmGamPoi':
-#> 
-#>     vars
 ggplot(de_res, aes(x = lfc, y = -log10(pval))) +
   geom_point(size = 0.6, aes(color = adj_pval < 0.1)) +
   ggtitle("Volcano Plot", "Genes that change most through interferon-beta treatment in T cells")
 ```
-
-![](man/figures/README-make_volcano_plot-1.png)<!-- -->
 
 Another important task in single cell data analysis is the
 identification of marker genes for cell clusters. For this we can also
@@ -428,20 +292,6 @@ fit_full <- glm_gp(sce_subset, design = ~ cell + stim +  stim:cell - 1,
                    reference_level = "NK cells")
 marker_genes <- test_de(fit_full, `cellCD4 T cells` - `cellB cells`, sort_by = pval)
 head(marker_genes)
-#>                          name          pval      adj_pval f_statistic df1
-#> 2873                     CD74 9.414538e-198 9.157522e-194   1411.8278   1
-#> 3150  HLA-DRA_ENSG00000204287 7.389637e-180 3.593950e-176   1228.0745   1
-#> 3152 HLA-DRB1_ENSG00000196126 1.921033e-121 6.228630e-118    717.8697   1
-#> 9116    CD79A_ENSG00000105369  2.307338e-74  5.610869e-71    390.5803   1
-#> 3166 HLA-DPA1_ENSG00000231389  3.226069e-70  6.275995e-67    364.8244   1
-#> 3167 HLA-DPB1_ENSG00000223865  2.257490e-64  3.659768e-61    329.2877   1
-#>           df2       lfc
-#> 2873 1070.895 -5.052300
-#> 3150 1070.895 -7.143245
-#> 3152 1070.895 -6.993047
-#> 9116 1070.895 -7.282279
-#> 3166 1070.895 -5.004210
-#> 3167 1070.895 -4.257008
 ```
 
 If we want find genes that differ in the stimulated condition, we just
@@ -453,20 +303,6 @@ marker_genes2 <- test_de(fit_full, (`cellCD4 T cells` + `cellCD4 T cells:stimsti
                         sort_by = pval)
 
 head(marker_genes2)
-#>                          name          pval      adj_pval f_statistic df1
-#> 2873                     CD74 8.764650e-187 8.525375e-183   1297.5198   1
-#> 3150  HLA-DRA_ENSG00000204287 5.304332e-175 2.579762e-171   1180.6034   1
-#> 3152 HLA-DRB1_ENSG00000196126 2.668295e-109 8.651501e-106    626.9933   1
-#> 3166 HLA-DPA1_ENSG00000231389  2.972347e-85  7.228005e-82    460.4820   1
-#> 3167 HLA-DPB1_ENSG00000223865  1.871362e-71  3.640548e-68    372.4584   1
-#> 9116    CD79A_ENSG00000105369  1.327524e-58  2.152138e-55    295.0837   1
-#>           df2        lfc
-#> 2873 1070.895  -4.753566
-#> 3150 1070.895  -6.635859
-#> 3152 1070.895  -5.969909
-#> 3166 1070.895  -5.207105
-#> 3167 1070.895  -5.086061
-#> 9116 1070.895 -10.000000
 ```
 
 We identify many genes related to the human leukocyte antigen (HLA)
@@ -493,91 +329,8 @@ ggplot(tmp, aes(x = celltype, y = expression)) +
   ggtitle("Marker genes of B vs. T cells")
 ```
 
-![](man/figures/README-plot_marker_genes-1.png)<!-- -->
+## Acknowlegments
 
-# Acknowlegments
+Original work for the glmGamPoi package was supported by the EMBL International PhD Programme and the European Research Council Synergy grant DECODE under grant agreement No. 810296.
 
-This work was supported by the EMBL International PhD Programme and the
-European Research Council Synergy grant DECODE under grant agreement
-No. 810296.
-
-# Session Info
-
-``` r
-sessionInfo()
-#> R version 4.2.1 RC (2022-06-17 r82503)
-#> Platform: x86_64-apple-darwin17.0 (64-bit)
-#> Running under: macOS Big Sur ... 10.16
-#> 
-#> Matrix products: default
-#> BLAS:   /Library/Frameworks/R.framework/Versions/4.2/Resources/lib/libRblas.0.dylib
-#> LAPACK: /Library/Frameworks/R.framework/Versions/4.2/Resources/lib/libRlapack.dylib
-#> 
-#> locale:
-#> [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
-#> 
-#> attached base packages:
-#> [1] stats4    stats     graphics  grDevices utils     datasets  methods  
-#> [8] base     
-#> 
-#> other attached packages:
-#>  [1] ggplot2_3.4.0               muscData_1.12.0            
-#>  [3] ExperimentHub_2.6.0         AnnotationHub_3.6.0        
-#>  [5] BiocFileCache_2.6.0         dbplyr_2.3.0               
-#>  [7] TENxPBMCData_1.16.0         HDF5Array_1.26.0           
-#>  [9] rhdf5_2.42.0                SingleCellExperiment_1.20.0
-#> [11] DelayedMatrixStats_1.20.0   DelayedArray_0.24.0        
-#> [13] Matrix_1.5-3                SummarizedExperiment_1.28.0
-#> [15] Biobase_2.58.0              GenomicRanges_1.50.2       
-#> [17] GenomeInfoDb_1.34.9         IRanges_2.32.0             
-#> [19] S4Vectors_0.36.1            BiocGenerics_0.44.0        
-#> [21] MatrixGenerics_1.10.0       matrixStats_0.63.0         
-#> [23] glmGamPoi_1.11.4           
-#> 
-#> loaded via a namespace (and not attached):
-#>  [1] bitops_1.0-7                  bit64_4.0.5                  
-#>  [3] RColorBrewer_1.1-3            filelock_1.0.2               
-#>  [5] httr_1.4.4                    tools_4.2.1                  
-#>  [7] utf8_1.2.3                    R6_2.5.1                     
-#>  [9] colorspace_2.1-0              DBI_1.1.3                    
-#> [11] rhdf5filters_1.10.0           withr_2.5.0                  
-#> [13] tidyselect_1.2.0              DESeq2_1.38.3                
-#> [15] bit_4.0.5                     curl_5.0.0                   
-#> [17] compiler_4.2.1                cli_3.6.0                    
-#> [19] labeling_0.4.2                scales_1.2.1                 
-#> [21] bench_1.1.2                   rappdirs_0.3.3               
-#> [23] digest_0.6.31                 rmarkdown_2.20               
-#> [25] XVector_0.38.0                pkgconfig_2.0.3              
-#> [27] htmltools_0.5.4               sparseMatrixStats_1.10.0     
-#> [29] highr_0.10                    limma_3.54.1                 
-#> [31] fastmap_1.1.0                 rlang_1.0.6                  
-#> [33] rstudioapi_0.14               RSQLite_2.2.20               
-#> [35] shiny_1.7.4                   farver_2.1.1                 
-#> [37] generics_0.1.3                BiocParallel_1.32.5          
-#> [39] dplyr_1.1.0                   RCurl_1.98-1.10              
-#> [41] magrittr_2.0.3                GenomeInfoDbData_1.2.9       
-#> [43] munsell_0.5.0                 Rcpp_1.0.10                  
-#> [45] Rhdf5lib_1.20.0               fansi_1.0.4                  
-#> [47] lifecycle_1.0.3               edgeR_3.40.2                 
-#> [49] yaml_2.3.7                    zlibbioc_1.44.0              
-#> [51] grid_4.2.1                    blob_1.2.3                   
-#> [53] parallel_4.2.1                promises_1.2.0.1             
-#> [55] crayon_1.5.2                  lattice_0.20-45              
-#> [57] profmem_0.6.0                 Biostrings_2.66.0            
-#> [59] beachmat_2.14.0               splines_4.2.1                
-#> [61] annotate_1.76.0               KEGGREST_1.38.0              
-#> [63] locfit_1.5-9.7                knitr_1.42                   
-#> [65] pillar_1.8.1                  geneplotter_1.76.0           
-#> [67] codetools_0.2-19              XML_3.99-0.13                
-#> [69] glue_1.6.2                    BiocVersion_3.16.0           
-#> [71] evaluate_0.20                 BiocManager_1.30.19          
-#> [73] png_0.1-8                     vctrs_0.5.2                  
-#> [75] httpuv_1.6.8                  gtable_0.3.1                 
-#> [77] purrr_1.0.1                   assertthat_0.2.1             
-#> [79] cachem_1.0.6                  xfun_0.37                    
-#> [81] mime_0.12                     xtable_1.8-4                 
-#> [83] later_1.3.0                   tibble_3.1.8                 
-#> [85] AnnotationDbi_1.60.0          memoise_2.0.1                
-#> [87] ellipsis_0.3.2                interactiveDisplayBase_1.36.0
-#> [89] BiocStyle_2.26.0
-```
+Work for the glmGamPoi2 fork was supported by startup funds from the University of Toronto under the supervision of Dr. Aleksandrina Goeva.
