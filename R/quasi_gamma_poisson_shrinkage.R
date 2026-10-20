@@ -1,6 +1,3 @@
-
-
-
 #' Shrink the overdispersion estimates
 #'
 #' Low-level function to shrink a set of overdispersion
@@ -77,24 +74,24 @@
 #'
 #' @seealso \code{limma::squeezeVar()}
 #' @export
-overdispersion_shrinkage <- function(disp_est, gene_means, df,
-                                     disp_trend = TRUE,
-                                     ql_disp_trend = NULL,
-                                     ...,
-                                     verbose = FALSE){
-  est_value <- ! (is.na(disp_est) | is.na(gene_means) | is.na(df))
+overdispersion_shrinkage <- function(disp_est, gene_means, df, disp_trend = TRUE, ql_disp_trend = NULL, ..., verbose = FALSE) {
+  est_value <- !(is.na(disp_est) | is.na(gene_means) | is.na(df))
   stopifnot(length(disp_est) == length(gene_means))
 
-  if(is.null(disp_trend) || isTRUE(disp_trend)){
-    if(verbose){ message("Fit dispersion trend") }
+  if (is.null(disp_trend) || isTRUE(disp_trend)) {
+    if (verbose) {
+      message("Fit dispersion trend")
+    }
     disp_trend <- rep(NA, length(disp_est))
     disp_trend[est_value] <- loc_median_fit(gene_means[est_value], y = disp_est[est_value], ...)
-  }else if(isFALSE(disp_trend)) {
+  } else if (isFALSE(disp_trend)) {
     disp_trend <- rep(NA, length(disp_est))
     disp_trend[est_value] <- rep(mean(disp_est, na.rm = TRUE), sum(est_value))
   }
 
-  if(verbose){ message("Shrink dispersion estimates") }
+  if (verbose) {
+    message("Shrink dispersion estimates")
+  }
   # Lund et al. 2012. Equation 4. Not ideal for very small counts
   # ql_disp <- rowSums2(compute_gp_deviance_residuals_matrix(Y, Mu, disp_trend)^2) / df
 
@@ -105,16 +102,8 @@ overdispersion_shrinkage <- function(disp_est, gene_means, df,
 
   var_pr <- variance_prior(ql_disp, df, covariate = gene_means, abundance_trend = ql_disp_trend)
 
-  list(dispersion_trend = disp_trend, ql_disp_estimate = ql_disp,
-       ql_disp_trend = var_pr$variance0, ql_disp_shrunken = var_pr$var_post,
-       ql_df0 = var_pr$df0)
+  list(dispersion_trend = disp_trend, ql_disp_estimate = ql_disp, ql_disp_trend = var_pr$variance0, ql_disp_shrunken = var_pr$var_post, ql_df0 = var_pr$df0)
 }
-
-
-
-
-
-
 
 
 #' Estimate the scale and df for a Inverse Chisquare distribution that generate the true gene variances
@@ -142,75 +131,80 @@ overdispersion_shrinkage <- function(disp_est, gene_means, df,
 #' @seealso \code{limma::squeezeVar()}
 #'
 #' @keywords internal
-variance_prior <- function(s2, df, covariate = NULL, abundance_trend = NULL){
+variance_prior <- function(s2, df, covariate = NULL, abundance_trend = NULL) {
   stopifnot(length(s2) == length(df) || length(df) == 1)
   stopifnot(is.null(covariate) || length(covariate) == length(s2))
-  if(is.null(covariate) && isTRUE(abundance_trend)) {
+  if (is.null(covariate) && isTRUE(abundance_trend)) {
     stop("If abundance_trend is true, covariate must not be 'NULL'.")
   }
 
-  if(all(is.na(s2))){
+  if (all(is.na(s2))) {
     # This happens if input has zero columns
     return(list(variance0 = rep(NA, length(s2)), df0 = NA, var_post = s2))
   }
 
   s2_sub <- na.omit(s2)
-  if(all(s2_sub == 1)){
+  if (all(s2_sub == 1)) {
     # Happens for example if overdispersion is fixed to 0 -> Poisson GLM
     return(list(variance0 = rep(1, length(s2)), df0 = Inf, var_post = s2))
   }
-  if(any(df <= 0, na.rm=TRUE)){
-    stop(paste0("All df must be positive. df ", paste0(which(df <= 0), collapse=", "), " are not."))
+  if (any(df <= 0, na.rm = TRUE)) {
+    stop(paste0("All df must be positive. df ", paste0(which(df <= 0), collapse = ", "), " are not."))
   }
-  if(any(s2 <= 0, na.rm=TRUE)){
-    stop(paste0("All s2 must be positive. s2 ", paste0(which(s2 <= 0), collapse=", "), " are not."))
+  if (any(s2 <= 0, na.rm = TRUE)) {
+    stop(paste0("All s2 must be positive. s2 ", paste0(which(s2 <= 0), collapse = ", "), " are not."))
   }
 
   # Fit an intercept to s2
-  opt_res <- optim(par=c(log_variance0=0, log_df0_inv=0), function(par){
-    -sum(stats::df(s2_sub/exp(par[1]), df1=df, df2=exp(par[2]), log=TRUE) - par[1], na.rm=TRUE)
+  opt_res <- optim(par = c(log_variance0 = 0, log_df0_inv = 0), function(par) {
+    -sum(stats::df(s2_sub / exp(par[1]), df1 = df, df2 = exp(par[2]), log = TRUE) - par[1], na.rm = TRUE)
   })
   variance0 <- rep(exp(unname(opt_res$par[1])), times = length(s2_sub))
   df0 <- exp(unname(opt_res$par[2]))
 
-  if(is.numeric(abundance_trend)){
+  if (is.numeric(abundance_trend)) {
     stop("Numeric abundance trend is not supported.")
-  }else if(is.null(covariate) || is.null(abundance_trend) || ! abundance_trend || length(s2_sub) < 10 || sum(covariate > 1e-8, na.rm = TRUE) < 10) {
-    if(length(s2_sub) < 10 && isTRUE(abundance_trend)){
-      warning("abundance_trend was set to 'TRUE', however there were not enough observations (length(s2) = ",
-              length(s2_sub), " < 10) to fit the trend.")
+  } else if (is.null(covariate) || is.null(abundance_trend) || !abundance_trend || length(s2_sub) < 10 || sum(covariate > 1e-8, na.rm = TRUE) < 10) {
+    if (length(s2_sub) < 10 && isTRUE(abundance_trend)) {
+      warning("abundance_trend was set to 'TRUE', however there were not enough observations (length(s2) = ", length(s2_sub), " < 10) to fit the trend.")
     }
     # Do nothing else to data
-  }else{
+  } else {
     # Fit a trend!
     # Fit a spline through the log(s2_sub) ~ covariate + 1 to account
     # for remaing trends in s2_sub
-    covariate_sub <- covariate[! is.na(s2)]
+    covariate_sub <- covariate[!is.na(s2)]
     log_covariate <- log(covariate_sub)
     not_zero <- covariate_sub > 1e-8
     ra <- range(log_covariate[not_zero])
-    knots <- ra[1] + c(1/3, 2/3) * (ra[2] - ra[1])
-    tryCatch({
-      design <- splines::ns(log_covariate[not_zero], df = 4, knots = knots, intercept = TRUE)
-      init_fit <- lm.fit(design, log(s2_sub[not_zero]))
-      opt_res <- optim(par=c(betas = init_fit$coefficients, log_df0_inv=0), function(par){
-        variance0 <- exp(design %*% par[1:4])
-        df0 <- exp(par[5])
-        -sum(stats::df(s2_sub[not_zero]/variance0, df1=df, df2=df0, log=TRUE) - log(variance0), na.rm=TRUE)
-      }, control = list(maxit = 5000))
-      variance0[not_zero] <- c(exp(design %*% opt_res$par[1:4]))
-      df0 <- exp(unname(opt_res$par[5]))
-    }, error = function(e){
-      warning("Problem fitting the abundance trend to the quasi-likelihood dispersion. ",
-              "Falling back to non-trended variance0 estimation.")
-    })
+    knots <- ra[1] + c(1 / 3, 2 / 3) * (ra[2] - ra[1])
+    tryCatch(
+      {
+        design <- splines::ns(log_covariate[not_zero], df = 4, knots = knots, intercept = TRUE)
+        init_fit <- lm.fit(design, log(s2_sub[not_zero]))
+        opt_res <- optim(
+          par = c(betas = init_fit$coefficients, log_df0_inv = 0),
+          function(par) {
+            variance0 <- exp(design %*% par[1:4])
+            df0 <- exp(par[5])
+            -sum(stats::df(s2_sub[not_zero] / variance0, df1 = df, df2 = df0, log = TRUE) - log(variance0), na.rm = TRUE)
+          },
+          control = list(maxit = 5000)
+        )
+        variance0[not_zero] <- c(exp(design %*% opt_res$par[1:4]))
+        df0 <- exp(unname(opt_res$par[5]))
+      },
+      error = function(e) {
+        warning("Problem fitting the abundance trend to the quasi-likelihood dispersion. ", "Falling back to non-trended variance0 estimation.")
+      }
+    )
   }
 
-  if(opt_res$convergence != 0){
+  if (opt_res$convergence != 0) {
     warning("Variance prior estimate did not properly converge\n")
   }
 
   var_post <- rep(NA, length(s2))
-  var_post[! is.na(s2)] <- (df0 * variance0 + df * s2_sub) / (df0 + df)
+  var_post[!is.na(s2)] <- (df0 * variance0 + df * s2_sub) / (df0 + df)
   list(variance0 = variance0, df0 = df0, var_post = var_post)
 }

@@ -1,10 +1,8 @@
 test_that("division with fix for zero by zero division works", {
-
   expect_equal(div_zbz_int(0, 0), 0)
   expect_equal(div_zbz_dbl(0, 0), 0)
   expect_equal(div_zbz_dbl(pi, exp(1)), pi / exp(1))
-  expect_equal(div_zbz_int(3, 4), 3/4)
-
+  expect_equal(div_zbz_int(3, 4), 3 / 4)
 
   # a <- rpois(n = 1e6, lambda = 0.1)
   # b <- rpois(n = 1e6, lambda = 0.1)

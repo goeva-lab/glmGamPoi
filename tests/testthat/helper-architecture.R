@@ -1,9 +1,7 @@
-
-
-is_macos <- function(){
+is_macos <- function() {
   Sys.info()["sysname"] == "Darwin"
 }
 
-is_windows <- function(){
+is_windows <- function() {
   Sys.info()["sysname"] == "Windows"
 }

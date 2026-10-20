@@ -1,4 +1,3 @@
-
 # Give me all the warnings
 options(
   warnPartialMatchDollar = TRUE,

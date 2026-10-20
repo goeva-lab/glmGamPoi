@@ -1,24 +1,23 @@
 test_that("test_de works", {
   set.seed(1)
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol  =10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- model.matrix(~ group + cont1 + cont2, data = annot)
   reduced_des <- model.matrix(~ group + cont1, data = annot)
   fit <- glm_gp(Y, design = design)
   res <- test_de(fit, reduced_design = reduced_des)
   res2 <- test_de(fit, contrast = cont2)
   # Should be equal except for log-fold change column
-  expect_equal(res[,-7], res2[,-7], tolerance = 1e-6)
+  expect_equal(res[, -7], res2[, -7], tolerance = 1e-6)
   expect_equal(res$lfc, rep(NA, 30), tolerance = 1e-6)
-  expect_equal(res2$lfc, fit$Beta[,"cont2"] / log(2), tolerance = 1e-6)
+  expect_equal(res2$lfc, fit$Beta[, "cont2"] / log(2), tolerance = 1e-6)
 
   design_wo_intercept <- model.matrix(~ group + cont1 + cont2 - 1, data = annot)
-  red_design <- model.matrix( ~ cont1 + cont2 + 1, data = annot)
+  red_design <- model.matrix(~ cont1 + cont2 + 1, data = annot)
   fit_wo_intercept <- glm_gp(Y, design = design_wo_intercept)
   res3 <- test_de(fit_wo_intercept, reduced_design = red_design)
   res4 <- test_de(fit_wo_intercept, contrast = groupA - groupB)
-  expect_equal(res3[,-7], res4[,-7], tolerance = 1e-6)
+  expect_equal(res3[, -7], res4[, -7], tolerance = 1e-6)
 
   res5 <- test_de(fit, contrast = "-groupB")
   expect_equal(res4, res5, tolerance = 0.1)
@@ -26,9 +25,8 @@ test_that("test_de works", {
 
 test_that("test_de works with 'fact' specifications", {
   set.seed(1)
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol  =10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- model.matrix(~ group + cont1 + cont2, data = annot)
   reduced_des <- model.matrix(~ group + cont1, data = annot)
   fit <- glm_gp(Y, design = design)
@@ -43,9 +41,8 @@ test_that("test_de works with 'fact' specifications", {
 
 
 test_that("test_de works with contrast vector input", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol  =10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- model.matrix(~ group + cont1 + cont2, data = annot)
   fit <- glm_gp(Y, design = design)
   res1 <- test_de(fit, contrast = cont2 - groupB)
@@ -54,14 +51,12 @@ test_that("test_de works with contrast vector input", {
 
   # Error on malformed contrast vector
   expect_error(test_de(fit, contrast = c(0, -1, 0)))
-
 })
 
 test_that("test_de works with a matrix as contrast", {
-  Y <- matrix(rnbinom(n = 30 * 20, mu = 4, size = 0.3), nrow = 30, ncol  =20)
-  annot <- data.frame(group = sample(c("A", "B", "C"), size = 20, replace = TRUE),
-                      cont1 = rnorm(20), cont2 = rnorm(20, mean = 30))
-  design <- model.matrix(~ group + cont1 + cont2 -1, data = annot)
+  Y <- matrix(rnbinom(n = 30 * 20, mu = 4, size = 0.3), nrow = 30, ncol = 20)
+  annot <- data.frame(group = sample(c("A", "B", "C"), size = 20, replace = TRUE), cont1 = rnorm(20), cont2 = rnorm(20, mean = 30))
+  design <- model.matrix(~ group + cont1 + cont2 - 1, data = annot)
   fit <- glm_gp(Y, design = design)
   # res1 <- test_de(fit, contrast = cont2 - groupB)
   # res2 <- test_de(fit, contrast = c(0, -1, 0, 1))
@@ -72,29 +67,23 @@ test_that("test_de works with a matrix as contrast", {
 })
 
 
-
 test_that("test_de handles on_disk correctly", {
   Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
   Y_hdf5 <- HDF5Array::writeHDF5Array(Y)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   se <- SummarizedExperiment::SummarizedExperiment(Y_hdf5, colData = annot)
   # The actual check is difficult, because internally the res2 should be calculated on_disk
   fit1 <- glm_gp(se, design = ~ group + cont1 + cont2, on_disk = TRUE)
-  res1 <- test_de(fit1, reduced_design = ~ 1)
+  res1 <- test_de(fit1, reduced_design = ~1)
   fit2 <- glm_gp(se, design = ~ group + cont1 + cont2, on_disk = FALSE)
-  res2 <- test_de(fit2, reduced_design = ~ 1)
+  res2 <- test_de(fit2, reduced_design = ~1)
   expect_equal(res1, res2)
-
 })
-
 
 
 test_that("NSE works", {
   Y <- matrix(rnbinom(n = 30 * 100, mu = 4, size = 0.3), nrow = 30, ncol = 100)
-  annot <- data.frame(sample = sample(c("A", "B", "C", "D"), size = 100, replace = TRUE),
-                      cont1 = rnorm(100), cont2 = rnorm(100, mean = 30),
-                      cell_type = sample(c("Tcell", "Bcell", "Makrophages"), size = 100, replace = TRUE))
+  annot <- data.frame(sample = sample(c("A", "B", "C", "D"), size = 100, replace = TRUE), cont1 = rnorm(100), cont2 = rnorm(100, mean = 30), cell_type = sample(c("Tcell", "Bcell", "Makrophages"), size = 100, replace = TRUE))
   annot$condition <- ifelse(annot$sample %in% c("A", "B"), "ctrl", "treated")
   head(annot)
   se <- SummarizedExperiment::SummarizedExperiment(Y, colData = annot)
@@ -102,94 +91,78 @@ test_that("NSE works", {
 
   expect_no_error({
     res <- test_de(fit, conditionctrl - conditiontreated)
-    res2 <- test_de(fit, conditionctrl - conditiontreated,
-                    full_design =  ~ condition + cont1 + cont2 - 1,
-                    subset_to = cell_type == "Tcell",
-                    n_max = 4)
-    res3 <- test_de(fit, conditionctrl - conditiontreated,
-                    full_design =  ~ condition + cont1 - 1,
-                    subset_to = cell_type == "Tcell",
-                    pseudobulk_by = sample,
-                    n_max = 4)
-    res4 <- test_de(fit, reduced_design = ~ cont1 + 1,
-                    full_design = ~ cont1 + cont2,
-                    subset_to = cell_type == "Bcell",
-                    pseudobulk_by = sample,
-                    n_max = 4)
+    res2 <- test_de(fit, conditionctrl - conditiontreated, full_design = ~ condition + cont1 + cont2 - 1, subset_to = cell_type == "Tcell", n_max = 4)
+    res3 <- test_de(fit, conditionctrl - conditiontreated, full_design = ~ condition + cont1 - 1, subset_to = cell_type == "Tcell", pseudobulk_by = sample, n_max = 4)
+    res4 <- test_de(fit, reduced_design = ~ cont1 + 1, full_design = ~ cont1 + cont2, subset_to = cell_type == "Bcell", pseudobulk_by = sample, n_max = 4)
   })
 })
 
 
 test_that("Pseudo bulk produces same results as making it manually", {
   Y <- matrix(rnbinom(n = 30 * 100, mu = 4, size = 0.3), nrow = 30, ncol = 100)
-  annot <- data.frame(sample = sample(LETTERS[1:6], size = 100, replace = TRUE),
-                      cont1 = rnorm(100), cont2 = rnorm(100, mean = 30),
-                      cell_type = sample(c("Tcell", "Bcell", "Makrophages"), size = 100, replace = TRUE))
+  annot <- data.frame(sample = sample(LETTERS[1:6], size = 100, replace = TRUE), cont1 = rnorm(100), cont2 = rnorm(100, mean = 30), cell_type = sample(c("Tcell", "Bcell", "Makrophages"), size = 100, replace = TRUE))
   annot$condition <- ifelse(annot$sample %in% c("A", "B", "C"), "ctrl", "treated")
   se <- SummarizedExperiment::SummarizedExperiment(Y, colData = annot)
 
   fit <- glm_gp(se, design = ~ condition + cont1 + cont2 - 1, ridge_penalty = 5)
-  res <- test_de(fit, reduced_design = ~ cont1 + cont2 + 1,
-                 pseudobulk_by = sample)
+  res <- test_de(fit, reduced_design = ~ cont1 + cont2 + 1, pseudobulk_by = sample)
 
   splitter <- split(seq_len(ncol(se)), SummarizedExperiment::colData(se)$sample)
-  pseudobulk_mat <- do.call(cbind, lapply(splitter, function(idx){
-    matrixStats::rowSums2(assay(se), cols = idx)
-  }))
-  pseudo_design_mat <- do.call(rbind, lapply(splitter, function(idx){
-    matrixStats::colMeans2(fit$model_matrix, rows = idx, useNames = FALSE)
-  }))
-
+  pseudobulk_mat <- do.call(
+    cbind,
+    lapply(splitter, function(idx) {
+      matrixStats::rowSums2(assay(se), cols = idx)
+    })
+  )
+  pseudo_design_mat <- do.call(
+    rbind,
+    lapply(splitter, function(idx) {
+      matrixStats::colMeans2(fit$model_matrix, rows = idx, useNames = FALSE)
+    })
+  )
 
   fit2 <- glm_gp(pseudobulk_mat, design = pseudo_design_mat, ridge_penalty = 5)
   res2 <- test_de(fit2, contrast = Coef_1 - Coef_2)
 
   # Equal except for lfc column because of contrast vs reduced_design stuff:
-  expect_equal(res[,-7], res2[,-7])
+  expect_equal(res[, -7], res2[, -7])
 
-  res3 <- test_pseudobulk(se, design = ~ condition + cont1 + cont2 - 1,
-                          aggregate_cells_by = sample,
-                          contrast = conditionctrl - conditiontreated,
-                          ridge_penalty = 5)
+  res3 <- test_pseudobulk(se, design = ~ condition + cont1 + cont2 - 1, aggregate_cells_by = sample, contrast = conditionctrl - conditiontreated, ridge_penalty = 5)
   expect_equal(res2, res3)
 
-  res4 <- test_pseudobulk(se, design = ~ condition + cont1 + cont2 - 1,
-                          aggregate_cells_by = sample,
-                          contrast = conditionctrl - conditiontreated)
+  res4 <- test_pseudobulk(se, design = ~ condition + cont1 + cont2 - 1, aggregate_cells_by = sample, contrast = conditionctrl - conditiontreated)
 
-  res5 <- test_pseudobulk(se, design = ~ condition + cont1 + cont2,
-                          reference_level = "treated",
-                          aggregate_cells_by = sample,
-                          contrast = conditionctrl)
+  res5 <- test_pseudobulk(se, design = ~ condition + cont1 + cont2, reference_level = "treated", aggregate_cells_by = sample, contrast = conditionctrl)
   # They are as good as identical
-  lapply(c("pval", "adj_pval", "f_statistic", "lfc"), function(col){
+  lapply(c("pval", "adj_pval", "f_statistic", "lfc"), function(col) {
     expect_gt(cor(res4[[col]], res5[[col]]), 0.99)
   })
-
 })
 
 
 test_that("pseudobulk works with a matrix as contrast", {
   Y <- matrix(rnbinom(n = 30 * 100, mu = 4, size = 0.3), nrow = 30, ncol = 100)
-  annot <- data.frame(sample = sample(LETTERS[1:6], size = 100, replace = TRUE),
-                      cont1 = rnorm(100), cont2 = rnorm(100, mean = 30),
-                      cell_type = sample(c("Tcell", "Bcell", "Makrophages"), size = 100, replace = TRUE))
+  annot <- data.frame(sample = sample(LETTERS[1:6], size = 100, replace = TRUE), cont1 = rnorm(100), cont2 = rnorm(100, mean = 30), cell_type = sample(c("Tcell", "Bcell", "Makrophages"), size = 100, replace = TRUE))
   annot$condition <- ifelse(annot$sample %in% c("A", "B", "C"), "ctrl", "treated")
   se <- SummarizedExperiment::SummarizedExperiment(Y, colData = annot)
   fit <- glm_gp(se, design = ~ condition + cont1 + cont2 - 1, ridge_penalty = 5)
   contr_mat <- limma::makeContrasts(contrasts = c("conditiontreated - conditionctrl", "cont1 - conditionctrl", "cont1 - cont2"), levels = colnames(fit$Beta))
 
-  res <- test_de(fit, contrast = contr_mat,
-                 pseudobulk_by = sample)
+  res <- test_de(fit, contrast = contr_mat, pseudobulk_by = sample)
 
   splitter <- split(seq_len(ncol(se)), SummarizedExperiment::colData(se)$sample)
-  pseudobulk_mat <- do.call(cbind, lapply(splitter, function(idx){
-    matrixStats::rowSums2(assay(se), cols = idx)
-  }))
-  pseudo_design_mat <- do.call(rbind, lapply(splitter, function(idx){
-    matrixStats::colMeans2(fit$model_matrix, rows = idx)
-  }))
-
+  pseudobulk_mat <- do.call(
+    cbind,
+    lapply(splitter, function(idx) {
+      matrixStats::rowSums2(assay(se), cols = idx)
+    })
+  )
+  pseudo_design_mat <- do.call(
+    rbind,
+    lapply(splitter, function(idx) {
+      matrixStats::colMeans2(fit$model_matrix, rows = idx)
+    })
+  )
 
   fit2 <- glm_gp(pseudobulk_mat, design = pseudo_design_mat, ridge_penalty = 5)
   res2 <- test_de(fit2, contrast = contr_mat)
@@ -198,11 +171,9 @@ test_that("pseudobulk works with a matrix as contrast", {
 })
 
 
-
 test_that("offset is correctly propagated in test_de()", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol  =10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- model.matrix(~ group + cont1 + cont2, data = annot)
   reduced_des <- model.matrix(~ group + cont1, data = annot)
 
@@ -220,7 +191,6 @@ test_that("offset is correctly propagated in test_de()", {
 
 
 test_that("likelihood ratio test works with ridge_penalty", {
-
   set.seed(1)
   size <- 50
   group <- sample(LETTERS[1:4], size = size, replace = TRUE)
@@ -232,8 +202,7 @@ test_that("likelihood ratio test works with ridge_penalty", {
   fit2 <- glm_gp(y, group, ridge_penalty = 1e-6, overdispersion = 0)
   res2 <- test_de(fit2, B - D)
 
-  expect_equal(fit1[- which(names(fit1) == "ridge_penalty")],
-               fit2[- which(names(fit2) == "ridge_penalty")])
+  expect_equal(fit1[-which(names(fit1) == "ridge_penalty")], fit2[-which(names(fit2) == "ridge_penalty")])
   expect_equal(res1, res2)
 
   fit3 <- glm_gp(y, group, ridge_penalty = 5, overdispersion = 0)
@@ -243,7 +212,6 @@ test_that("likelihood ratio test works with ridge_penalty", {
   expect_gt(res3$f_statistic, 0)
   expect_gt(res3$pval, res2$pval)
 
-
   # Should be similar but not identical
   fit3 <- glm_gp(y, group, ridge_penalty = 10)
   fit4 <- glm_gp(y, group, ridge_penalty = 10, reference_level = "A")
@@ -251,39 +219,28 @@ test_that("likelihood ratio test works with ridge_penalty", {
   fit4$Beta
   test_de(fit3, B - D)
   test_de(fit4, B_vs_A - D_vs_A)
-
-
 })
 
 
 test_that("ridge_penalty is adapted if reduced_design is specified", {
-
   size <- 100
   y <- rnbinom(n = size, mu = 5, size = 1 / 3.1)
-  df <- data.frame(group = sample(LETTERS[1:2], size, replace = TRUE),
-                   cont = rnorm(size))
+  df <- data.frame(group = sample(LETTERS[1:2], size, replace = TRUE), cont = rnorm(size))
 
   fit <- glm_gp(y, design = ~ group + cont + group:cont, col_data = df)
   res1 <- test_de(fit, contrast = `groupB:cont`)
   res2 <- test_de(fit, reduced_design = ~ group + cont)
-  expect_equal(res1[,-which(names(res1) == "lfc")],
-               res2[,-which(names(res2) == "lfc")],
-               tolerance = 1e-7)
+  expect_equal(res1[, -which(names(res1) == "lfc")], res2[, -which(names(res2) == "lfc")], tolerance = 1e-7)
 
-  fit_ridge <- glm_gp(y, design = ~ group + cont + group:cont, col_data = df,
-                      ridge_penalty = 1.2, reference_level = "B")
+  fit_ridge <- glm_gp(y, design = ~ group + cont + group:cont, col_data = df, ridge_penalty = 1.2, reference_level = "B")
   res1 <- test_de(fit_ridge, contrast = `groupA:cont`)
   res2 <- test_de(fit_ridge, reduced_design = ~ group + cont)
-  expect_equal(res1[,-which(names(res1) == "lfc")],
-               res2[,-which(names(res2) == "lfc")],
-               tolerance = 1e-6)
-
-
+  expect_equal(res1[, -which(names(res1) == "lfc")], res2[, -which(names(res2) == "lfc")], tolerance = 1e-6)
 })
 
 
 test_that("ignore_degeneracy is propagated", {
-  y <- rnbinom(n = 30, mu = 7, size = 1/2.2)
+  y <- rnbinom(n = 30, mu = 7, size = 1 / 2.2)
   X <- cbind(matrix(rnorm(n = 30 * 3), nrow = 30, ncol = 3), 0)
   Xmod <- X
   attr(Xmod, "ignore_degeneracy") <- TRUE
@@ -298,14 +255,13 @@ test_that("ignore_degeneracy is propagated", {
 
 test_that("test_de works without shrinkage", {
   set.seed(1)
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol  =10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 4, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   fit <- glm_gp(Y, design = ~ group + cont1, col_data = annot)
-  res <- test_de(fit, reduced_design = ~ group)
+  res <- test_de(fit, reduced_design = ~group)
 
   fit2 <- glm_gp(Y, design = ~ group + cont1, col_data = annot, overdispersion_shrinkage = FALSE)
-  res2 <- test_de(fit2, reduced_design = ~ group)
+  res2 <- test_de(fit2, reduced_design = ~group)
 
   expect_equal(colnames(res), colnames(res2))
   expect_equal(res$name, res2$name)
@@ -316,20 +272,17 @@ test_that("test_de works without shrinkage", {
 
 
 test_that("test_de works with compute_lfc_se", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 3000, size = 0.3), nrow = 30, ncol  =10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 3000, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
   design <- model.matrix(~ group + cont1 + cont2, data = annot)
   cntrst <- c(0, -1, 0, 0)
   fit <- glm_gp(Y, design = design, overdispersion_shrinkage = TRUE, size_factors = "ratio")
-  res <- test_de(fit, contrast = cntrst,
-                 compute_lfc_se=TRUE)
-  pred <- predict(fit, se.fit=TRUE, newdata=matrix(cntrst, nrow=1))
+  res <- test_de(fit, contrast = cntrst, compute_lfc_se = TRUE)
+  pred <- predict(fit, se.fit = TRUE, newdata = matrix(cntrst, nrow = 1))
 
-  expect_equal(res$lfc_se, pred$se.fit[,1] / log(2))
+  expect_equal(res$lfc_se, pred$se.fit[, 1] / log(2))
 
-  res2 <- test_de(fit, reduced_design = model.matrix(~ cont1 + cont2, data = annot),
-                 compute_lfc_se=TRUE)
+  res2 <- test_de(fit, reduced_design = model.matrix(~ cont1 + cont2, data = annot), compute_lfc_se = TRUE)
 
   expect_equal(res$pval, res2$pval)
   expect_true(all(is.na(res2$lfc)))
@@ -347,17 +300,15 @@ test_that("test_de works with compute_lfc_se", {
 })
 
 test_that("test_de works with degenerate designs", {
-  Y <- matrix(rnbinom(n = 30 * 10, mu = 3000, size = 0.3), nrow = 30, ncol  =10)
-  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE),
-                      cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
-  design <- model.matrix(~ group, data = annot)
-  design <- cbind(design, design[,2])
+  Y <- matrix(rnbinom(n = 30 * 10, mu = 3000, size = 0.3), nrow = 30, ncol = 10)
+  annot <- data.frame(group = sample(c("A", "B"), size = 10, replace = TRUE), cont1 = rnorm(10), cont2 = rnorm(10, mean = 30))
+  design <- model.matrix(~group, data = annot)
+  design <- cbind(design, design[, 2])
   attr(design, "ignore_degeneracy") <- TRUE
   cntrst <- matrix(c(0, 1, 0), nrow = 1)
-  fit <- glm_gp(Y, design = design, overdispersion_shrinkage = TRUE, size_factors = "ratio",
-                ridge_penalty = 1e-3)
+  fit <- glm_gp(Y, design = design, overdispersion_shrinkage = TRUE, size_factors = "ratio", ridge_penalty = 1e-3)
   skip("test_de with compute_lfc_se cannot handle degenerate designs")
-  res <- test_de(fit, contrast = c(cntrst), compute_lfc_se=TRUE)
+  res <- test_de(fit, contrast = c(cntrst), compute_lfc_se = TRUE)
   expect_true(all(res$lfc_se > 10))
 
   # res$pval_alt <- with(res, 2 * pnorm(abs(lfc / lfc_se), lower.tail = FALSE))
@@ -425,7 +376,6 @@ test_that("test_de works with degenerate designs", {
   # cov_mat2 <- solve(t(mod_design) %*% mod_design + ridge_penalty) %*% t(mod_design) %*% diag(residuals(lm_fit)^2) %*% mod_design %*% solve(t(mod_design) %*% mod_design + ridge_penalty)
   # V %*% cov_mat2 %*% t(V)
 })
-
 
 # test_that("glmGamPoi results are similar to DESeq2",{
 #   Y <- matrix(rnbinom(n = 30 * 10, mu = 3000, size = 0.3), nrow = 30, ncol  =10)

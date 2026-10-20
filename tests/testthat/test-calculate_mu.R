@@ -1,8 +1,4 @@
-
-
-
 test_that("DelayedMultiplication works properly", {
-
   Beta <- matrix(c(rnorm(n = 200), rnorm(n = 200, mean = 10)), nrow = 200, ncol = 2)
   model_matrix <- cbind(1, rpois(n = 7000, lambda = 3))
 
@@ -13,13 +9,10 @@ test_that("DelayedMultiplication works properly", {
   res2 <- delayed_matrix_multiply(Beta_da, t(model_matrix_da))
 
   expect_equal(res, as.matrix(res2))
-
-
 })
 
 
 test_that("calculating mu with DelayedArrays works properly", {
-
   Beta <- matrix(c(rnorm(n = 20), rnorm(n = 20, mean = 10)), nrow = 20, ncol = 2)
   model_matrix <- cbind(1, rpois(n = 300, lambda = 3))
   offset_matrix <- matrix(1.3, nrow = 20, ncol = 300)
@@ -32,5 +25,3 @@ test_that("calculating mu with DelayedArrays works properly", {
 
   expect_equal(mu, as.matrix(mu2))
 })
-
-

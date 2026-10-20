@@ -1,8 +1,4 @@
-
-
-
 test_that("eval_with works in simple cases", {
-
   data <- data.frame(x = 1:3, a = LETTERS[1:3], stringsAsFactors = FALSE)
 
   expect_equal(eval_with(x * 3, data), data$x * 3)
@@ -13,5 +9,3 @@ test_that("eval_with works in simple cases", {
   expect_equal(eval_with(a[1:2], data), data$a[1:2])
   expect_error(eval_with(b, data))
 })
-
-

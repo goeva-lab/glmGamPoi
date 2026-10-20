@@ -231,36 +231,36 @@
 #'   [https://doi.org/10.1186/s13059-016-0947-7](https://doi.org/10.1186/s13059-016-0947-7)
 #'
 #' @export
-glm_gp <- function(data,
-                   design = ~ 1,
-                   col_data = NULL,
-                   reference_level = NULL,
-                   offset = 0,
-                   size_factors = c("normed_sum", "deconvolution", "poscounts", "ratio"),
-                   overdispersion = TRUE,
-                   overdispersion_shrinkage = TRUE,
-                   ridge_penalty = 0,
-                   do_cox_reid_adjustment = TRUE,
-                   subsample = FALSE,
-                   on_disk = NULL,
-                   use_assay = NULL,
-                   perf_optim = FALSE,
-                   verbose = FALSE){
-
+glm_gp <- function(
+  data,
+  design = ~1,
+  col_data = NULL,
+  reference_level = NULL,
+  offset = 0,
+  size_factors = c("normed_sum", "deconvolution", "poscounts", "ratio"),
+  overdispersion = TRUE,
+  overdispersion_shrinkage = TRUE,
+  ridge_penalty = 0,
+  do_cox_reid_adjustment = TRUE,
+  subsample = FALSE,
+  on_disk = NULL,
+  use_assay = NULL,
+  perf_optim = FALSE,
+  verbose = FALSE
+) {
   # Validate `data`
-  if(inherits(data, "formula")){
-    if(length(design) != 2 || design != ~ 1){
-      stop("If the first argument is already a formula, the second argument must not be set. Please call this function like this:\n",
-           "'glm_gp(data = mat, design = ~ a + b + c, ...)'", call. = FALSE)
+  if (inherits(data, "formula")) {
+    if (length(design) != 2 || design != ~1) {
+      stop("If the first argument is already a formula, the second argument must not be set. Please call this function like this:\n", "'glm_gp(data = mat, design = ~ a + b + c, ...)'", call. = FALSE)
     }
     extr <- extract_data_from_formula(data, col_data, parent.frame())
     data <- extr$data
     design <- extr$design
   }
-  if(is.vector(data)){
+  if (is.vector(data)) {
     data <- matrix(data, nrow = 1)
   }
-  data_mat <- handle_data_parameter(data, use_assay, on_disk ,verbose = verbose)
+  data_mat <- handle_data_parameter(data, use_assay, on_disk, verbose = verbose)
 
   # Convert the formula to a model_matrix
   col_data <- get_col_data(data, col_data)
@@ -269,33 +269,34 @@ glm_gp <- function(data,
   perf_optim <- handle_perf_optim_parameter(perf_optim)
 
   # Call glm_gp_impl()
-  res <- glm_gp_impl(data_mat,
-              model_matrix = des$model_matrix,
-              offset = offset,
-              size_factors = size_factors,
-              overdispersion = overdispersion,
-              overdispersion_shrinkage = overdispersion_shrinkage,
-              ridge_penalty = ridge_penalty,
-              do_cox_reid_adjustment = do_cox_reid_adjustment,
-              subsample = subsample,
-              perf_optim = perf_optim,
-              verbose = verbose)
+  res <- glm_gp_impl(
+    data_mat,
+    model_matrix = des$model_matrix,
+    offset = offset,
+    size_factors = size_factors,
+    overdispersion = overdispersion,
+    overdispersion_shrinkage = overdispersion_shrinkage,
+    ridge_penalty = ridge_penalty,
+    do_cox_reid_adjustment = do_cox_reid_adjustment,
+    subsample = subsample,
+    perf_optim = perf_optim,
+    verbose = verbose
+  )
   # Make sure that the output is nice and beautiful
   rownames(data_mat) <- rownames(data)
   colnames(data_mat) <- colnames(data)
-  res$data <- SummarizedExperiment::SummarizedExperiment(list(counts = data_mat),
-                                                         colData = col_data)
+  res$data <- SummarizedExperiment::SummarizedExperiment(list(counts = data_mat), colData = col_data)
   res$model_matrix <- des$model_matrix
-  if(is.null(colnames(res$model_matrix))){
+  if (is.null(colnames(res$model_matrix))) {
     colnames(res$model_matrix) <- paste0("Coef_", seq_len(ncol(res$model_matrix)))
   }
   res$design_formula <- des$design_formula
   colnames(res$Beta) <- colnames(res$model_matrix)
   rownames(res$Beta) <- rownames(data)
-  if(! is.null(res$ridge_penalty)){
+  if (!is.null(res$ridge_penalty)) {
     names(res$ridge_penalty) <- colnames(res$model_matrix)
   }
-  if(is.function(res$Mu)){
+  if (is.function(res$Mu)) {
     .old <- res$Mu
     res$Mu <- function(i = NULL, j = NULL) {
       if (!is.null(i)) {
@@ -326,13 +327,13 @@ glm_gp <- function(data,
       colnames(o) <- cn
       o
     }
-  }else{
+  } else {
     rownames(res$Mu) <- rownames(data)
     colnames(res$Mu) <- colnames(data)
   }
-  if(is.vector(res$Offset, mode = "numeric")){
+  if (is.vector(res$Offset, mode = "numeric")) {
     names(res$Offset) <- colnames(data)
-  }else{
+  } else {
     rownames(res$Offset) <- rownames(data)
     colnames(res$Offset) <- colnames(data)
   }
@@ -347,195 +348,216 @@ glm_gp <- function(data,
 }
 
 
-handle_data_parameter <- function(data, use_assay, on_disk, verbose = FALSE){
-  if(is.matrix(data) || is(data, "dgCMatrix")){
-    if(is.matrix(data) && ! is.numeric(data)){
+handle_data_parameter <- function(data, use_assay, on_disk, verbose = FALSE) {
+  if (is.matrix(data) || is(data, "dgCMatrix")) {
+    if (is.matrix(data) && !is.numeric(data)) {
       stop("The data argument must consist of numeric values and not of ", mode(data), " values")
     }
-    if(is.null(on_disk) || isFALSE(on_disk)){
+    if (is.null(on_disk) || isFALSE(on_disk)) {
       data_mat <- data
-    }else if(isTRUE(on_disk)){
+    } else if (isTRUE(on_disk)) {
       data_mat <- HDF5Array::writeHDF5Array(data)
-    }else{
+    } else {
       stop("Illegal argument type for on_disk. Can only handle 'NULL', 'TRUE', or 'FALSE'")
     }
-  }else if(is(data, "DelayedArray")){
-    if(is.null(on_disk) || isTRUE(on_disk)){
+  } else if (is(data, "DelayedArray")) {
+    if (is.null(on_disk) || isTRUE(on_disk)) {
       data_mat <- data
-    }else if(isFALSE(on_disk)){
+    } else if (isFALSE(on_disk)) {
       data_mat <- as.matrix(data)
-    }else{
+    } else {
       stop("Illegal argument type for on_disk. Can only handle 'NULL', 'TRUE', or 'FALSE'")
     }
-  }else if(is(data, "SummarizedExperiment")){
-    if(is.null(use_assay)){
-      use_assay <- if("counts" %in% SummarizedExperiment::assayNames(data)) "counts" else {
-        assay_names <-  SummarizedExperiment::assayNames(data)
-        if(is.null(assay_names)){
-          if(verbose) message("Using unnamed assay")
+  } else if (is(data, "SummarizedExperiment")) {
+    if (is.null(use_assay)) {
+      use_assay <- if ("counts" %in% SummarizedExperiment::assayNames(data)) {
+        "counts"
+      } else {
+        assay_names <- SummarizedExperiment::assayNames(data)
+        if (is.null(assay_names)) {
+          if (verbose) {
+            message("Using unnamed assay")
+          }
           1
-        }else if(length(assay_names) == 1){
-          if(verbose) message("Using assay '", assay_names, "'")
+        } else if (length(assay_names) == 1) {
+          if (verbose) {
+            message("Using assay '", assay_names, "'")
+          }
           1
-        }else{
+        } else {
           stop("Please specify the assay name.")
         }
       }
     }
     data_mat <- handle_data_parameter(SummarizedExperiment::assay(data, use_assay), use_assay = NULL, on_disk)
-  }else if(canCoerce(data, "SummarizedExperiment")){
+  } else if (canCoerce(data, "SummarizedExperiment")) {
     se <- as(data, "SummarizedExperiment")
-    if(is.null(use_assay)){
-      use_assay <- if("counts" %in% SummarizedExperiment::assayNames(data)) "counts" else {
-        assay_names <-  SummarizedExperiment::assayNames(data)
-        if(is.null(assay_names)){
-          if(verbose) message("Using unnamed assay")
+    if (is.null(use_assay)) {
+      use_assay <- if ("counts" %in% SummarizedExperiment::assayNames(data)) {
+        "counts"
+      } else {
+        assay_names <- SummarizedExperiment::assayNames(data)
+        if (is.null(assay_names)) {
+          if (verbose) {
+            message("Using unnamed assay")
+          }
           1
-        }else if(length(assay_names) == 1){
-          if(verbose) message("Using assay '", assay_names, "'")
+        } else if (length(assay_names) == 1) {
+          if (verbose) {
+            message("Using assay '", assay_names, "'")
+          }
           1
-        }else{
+        } else {
           stop("Please specify the assay name.")
         }
       }
     }
     data_mat <- handle_data_parameter(SummarizedExperiment::assay(se, use_assay), use_assay = NULL, on_disk)
-  }else if(is(data, "dgCMatrix") || is(data, "dgTMatrix")) {
-    if(isTRUE(on_disk)){
+  } else if (is(data, "dgCMatrix") || is(data, "dgTMatrix")) {
+    if (isTRUE(on_disk)) {
       data_mat <- HDF5Array::writeHDF5Array(data)
-    }else if(isFALSE(on_disk)){
+    } else if (isFALSE(on_disk)) {
       data_mat <- as.matrix(data)
-    }else{
+    } else {
       data_mat <- as(data, "CsparseMatrix")
     }
-  }else{
-    stop("Cannot handle data of class '", class(data), "'.",
-         "It must be of type dense matrix object (i.e., a base matrix or DelayedArray),",
-         " or a container for such a matrix (for example: SummarizedExperiment).")
+  } else {
+    stop("Cannot handle data of class '", class(data), "'.", "It must be of type dense matrix object (i.e., a base matrix or DelayedArray),", " or a container for such a matrix (for example: SummarizedExperiment).")
   }
   data_mat
 }
 
 
-get_col_data <- function(data, col_data){
-  if(is.null(col_data)){
-    col_data <- as.data.frame(matrix(numeric(0), nrow=ncol(data)))
+get_col_data <- function(data, col_data) {
+  if (is.null(col_data)) {
+    col_data <- as.data.frame(matrix(numeric(0), nrow = ncol(data)))
   }
-  if(is(data, "SummarizedExperiment")){
-    if(! identical(col_data, SummarizedExperiment::colData(data))){
-      if(any(colnames(col_data) %in% colnames(SummarizedExperiment::colData(data)))){
-        warning("The arguments 'col_data' and 'colData(data)' share the following column names: \n",
-                paste0(head(intersect(colnames(col_data), colnames(SummarizedExperiment::colData(data))), n = 5),
-                       collapse = ", "), "\n",
-                "This can cause problem.")
+  if (is(data, "SummarizedExperiment")) {
+    if (!identical(col_data, SummarizedExperiment::colData(data))) {
+      if (any(colnames(col_data) %in% colnames(SummarizedExperiment::colData(data)))) {
+        warning("The arguments 'col_data' and 'colData(data)' share the following column names: \n", paste0(head(intersect(colnames(col_data), colnames(SummarizedExperiment::colData(data))), n = 5), collapse = ", "), "\n", "This can cause problem.")
       }
       cbind(col_data, SummarizedExperiment::colData(data))
-    }else{
+    } else {
       col_data
     }
-  }else{
+  } else {
     col_data
   }
 }
 
 
-handle_design_parameter <- function(design, data, col_data, reference_level){
+handle_design_parameter <- function(design, data, col_data, reference_level) {
   n_samples <- ncol(data)
 
   ignore_degeneracy <- isTRUE(attr(design, "ignore_degeneracy"))
 
   # Handle the design parameter
-  if(is.matrix(design)){
-    if(! is.null(reference_level)){
-      stop("Cannot specify `design` as a matrix and `reference_level` != NULL.\n",
-           "Either provide `design` as a formula and specify `reference_level` or ",
-           "make sure that the correct reference level is used when the matrix is created ",
-           "for example with `stats::relevel()`.")
+  if (is.matrix(design)) {
+    if (!is.null(reference_level)) {
+      stop(
+        "Cannot specify `design` as a matrix and `reference_level` != NULL.\n",
+        "Either provide `design` as a formula and specify `reference_level` or ",
+        "make sure that the correct reference level is used when the matrix is created ",
+        "for example with `stats::relevel()`."
+      )
     }
     model_matrix <- design
     design_formula <- NULL
-  }else if((is.vector(design) || is.factor(design))){
-    if(length(design) != n_samples){
-      if(length(design) == 1 && design == 1){
-        stop("The specified design vector length (", length(design), ") does not match ",
-             "the number of samples: ", n_samples, "\n",
-             "Did you maybe mean: `design = ~ 1`?")
-      }else{
-        stop("The specified design vector length (", length(design), ") does not match ",
-             "the number of samples: ", n_samples)
+  } else if ((is.vector(design) || is.factor(design))) {
+    if (length(design) != n_samples) {
+      if (length(design) == 1 && design == 1) {
+        stop("The specified design vector length (", length(design), ") does not match ", "the number of samples: ", n_samples, "\n", "Did you maybe mean: `design = ~ 1`?")
+      } else {
+        stop("The specified design vector length (", length(design), ") does not match ", "the number of samples: ", n_samples)
       }
     }
     tmp <- convert_chr_vec_to_model_matrix(design, reference_level)
     model_matrix <- tmp$model_matrix
     design_formula <- tmp$formula
     attr(design_formula, "constructed_from") <- "vector"
-  }else if(inherits(design,"formula")){
+  } else if (inherits(design, "formula")) {
     col_data <- relevel_columns_to_reference_level(col_data, reference_level)
     tmp <- convert_formula_to_model_matrix(design, col_data)
     model_matrix <- tmp$model_matrix
     design_formula <- tmp$formula
     attr(design_formula, "constructed_from") <- "formula"
-  }else{
-    stop(paste0("design argment of class ", class(design), " is not supported. Please ",
-                "specify a `model_matrix`, a `character vector`, or a `formula`."))
+  } else {
+    stop(paste0("design argment of class ", class(design), " is not supported. Please ", "specify a `model_matrix`, a `character vector`, or a `formula`."))
   }
 
-  if(nrow(model_matrix) != ncol(data)) stop("Number of rows in col_data does not match number of columns of data.")
-  if(! is.null(rownames(model_matrix)) &&
-     ! all(rownames(model_matrix) == as.character(seq_len(nrow(model_matrix)))) && # That's the default rownames
-     ! is.null(colnames(data))){
-    if(! all(rownames(model_matrix) == colnames(data))){
-      if(setequal(rownames(model_matrix), colnames(data))){
+  if (nrow(model_matrix) != ncol(data)) {
+    stop("Number of rows in col_data does not match number of columns of data.")
+  }
+  if (
+    !is.null(rownames(model_matrix)) &&
+      !all(rownames(model_matrix) == as.character(seq_len(nrow(model_matrix)))) && # That's the default rownames
+      !is.null(colnames(data))
+  ) {
+    if (!all(rownames(model_matrix) == colnames(data))) {
+      if (setequal(rownames(model_matrix), colnames(data))) {
         # Rearrange the rows to match the columns of data
-        model_matrix <- model_matrix[colnames(data), ,drop=FALSE]
-      }else{
+        model_matrix <- model_matrix[colnames(data), , drop = FALSE]
+      } else {
         stop("The rownames of the model_matrix / col_data do not match the column names of data.")
       }
     }
   }
 
-  if(any(DelayedMatrixStats::rowAnyNAs(model_matrix))){
-    stop("The design matrix contains 'NA's for sample ",
-         paste0(head(which(DelayedMatrixStats::rowAnyNAs(model_matrix))), collapse = ", "),
-         ". Please remove them before you call 'glm_gp()'.")
+  if (any(DelayedMatrixStats::rowAnyNAs(model_matrix))) {
+    stop("The design matrix contains 'NA's for sample ", paste0(head(which(DelayedMatrixStats::rowAnyNAs(model_matrix))), collapse = ", "), ". Please remove them before you call 'glm_gp()'.")
   }
 
-  if(ncol(model_matrix) >= n_samples && ! ignore_degeneracy){
-    stop("The model_matrix has more columns (", ncol(model_matrix),
-         ") than the there are samples in the data matrix (", n_samples, " columns).\n",
-         "Too few replicates / too many coefficients to fit model.\n",
-         "The head of the design matrix: \n", format_matrix(head(model_matrix, n = 3)))
+  if (ncol(model_matrix) >= n_samples && !ignore_degeneracy) {
+    stop(
+      "The model_matrix has more columns (",
+      ncol(model_matrix),
+      ") than the there are samples in the data matrix (",
+      n_samples,
+      " columns).\n",
+      "Too few replicates / too many coefficients to fit model.\n",
+      "The head of the design matrix: \n",
+      format_matrix(head(model_matrix, n = 3))
+    )
   }
 
   # Check rank of model_matrix
   qr_mm <- qr(model_matrix)
-  if(qr_mm$rank < ncol(model_matrix) && n_samples > 0  && ! ignore_degeneracy){
+  if (qr_mm$rank < ncol(model_matrix) && n_samples > 0 && !ignore_degeneracy) {
     is_zero_column <- DelayedMatrixStats::colCounts(model_matrix, value = 0) == nrow(model_matrix)
-    if(any(is_zero_column)){
-      stop("The model matrix seems degenerate ('matrix_rank(model_matrix) < ncol(model_matrix)'). ",
-           "Column ", paste0(head(which(is_zero_column), n=10), collapse = ", "), " contains only zeros. \n",
-           "The head of the design matrix: \n", format_matrix(head(model_matrix, n = 3)))
-    }else{
-      stop("The model matrix seems degenerate ('matrix_rank(model_matrix) < ncol(model_matrix)'). ",
-           "Some columns are perfectly collinear. Did you maybe include the same coefficient twice?\n",
-           "The head of the design matrix: \n", format_matrix(head(model_matrix, n = 3)))
+    if (any(is_zero_column)) {
+      stop(
+        "The model matrix seems degenerate ('matrix_rank(model_matrix) < ncol(model_matrix)'). ",
+        "Column ",
+        paste0(head(which(is_zero_column), n = 10), collapse = ", "),
+        " contains only zeros. \n",
+        "The head of the design matrix: \n",
+        format_matrix(head(model_matrix, n = 3))
+      )
+    } else {
+      stop(
+        "The model matrix seems degenerate ('matrix_rank(model_matrix) < ncol(model_matrix)'). ",
+        "Some columns are perfectly collinear. Did you maybe include the same coefficient twice?\n",
+        "The head of the design matrix: \n",
+        format_matrix(head(model_matrix, n = 3))
+      )
     }
   }
 
   rownames(model_matrix) <- colnames(data)
   validate_model_matrix(model_matrix, data)
   model_matrix <- add_attr_if_intercept(model_matrix)
-  if(ignore_degeneracy){
+  if (ignore_degeneracy) {
     attr(model_matrix, "ignore_degeneracy") <- TRUE
   }
   list(model_matrix = model_matrix, design_formula = design_formula)
 }
 
-add_attr_if_intercept <- function(model_matrix){
+add_attr_if_intercept <- function(model_matrix) {
   intercept_position <- 0
-  for(col_idx in seq_len(ncol(model_matrix))){
-    has_intercept <- all(model_matrix[,col_idx] == 1)
-    if(has_intercept){
+  for (col_idx in seq_len(ncol(model_matrix))) {
+    has_intercept <- all(model_matrix[, col_idx] == 1)
+    if (has_intercept) {
       intercept_position <- col_idx
       break
     }
@@ -545,91 +567,92 @@ add_attr_if_intercept <- function(model_matrix){
 }
 
 
-
-handle_subsample_parameter <- function(data, subsample){
-  if(isFALSE(subsample)){
+handle_subsample_parameter <- function(data, subsample) {
+  if (isFALSE(subsample)) {
     n_subsamples <- ncol(data)
-  }else if(isTRUE(subsample)){
+  } else if (isTRUE(subsample)) {
     n_subsamples <- 1000
-  }else{
+  } else {
     n_subsamples <- subsample
   }
   min(n_subsamples, ncol(data))
 }
 
 
-handle_ridge_penalty_parameter <- function(ridge_penalty, model_matrix, verbose){
-  if(! is.null(ridge_penalty)){
+handle_ridge_penalty_parameter <- function(ridge_penalty, model_matrix, verbose) {
+  if (!is.null(ridge_penalty)) {
     # This penalty is helpful to protect against numerical instability
     minimal_penalty <- 1e-10 / nrow(model_matrix)
     intercept_position <- attr(model_matrix, "intercept_position")
 
-
-    if(length(ridge_penalty) == 1){
-      if(abs(ridge_penalty) < minimal_penalty){
+    if (length(ridge_penalty) == 1) {
+      if (abs(ridge_penalty) < minimal_penalty) {
         ridge_penalty <- minimal_penalty
       }
       ridge_target <- attr(ridge_penalty, "target")
       ridge_penalty <- rep_len(ridge_penalty, ncol(model_matrix))
       attr(ridge_penalty, "target") <- ridge_target
-      if(! is.null(intercept_position) && intercept_position[1] != 0){
+      if (!is.null(intercept_position) && intercept_position[1] != 0) {
         ridge_penalty[intercept_position] <- minimal_penalty
       }
-    }else if(is.matrix(ridge_penalty)){
-      if(ncol(ridge_penalty) != ncol(model_matrix)){
-        stop("'ridge_penalty' is a matrix, but its dimensions do not match ",
-             "the column of the model_matrix (", ncol(model_matrix), ").")
+    } else if (is.matrix(ridge_penalty)) {
+      if (ncol(ridge_penalty) != ncol(model_matrix)) {
+        stop("'ridge_penalty' is a matrix, but its dimensions do not match ", "the column of the model_matrix (", ncol(model_matrix), ").")
       }
-      diag(ridge_penalty)[abs(diag(ridge_penalty)) <  minimal_penalty] <- minimal_penalty
-    }else if(length(ridge_penalty) == ncol(model_matrix)){
+      diag(ridge_penalty)[abs(diag(ridge_penalty)) < minimal_penalty] <- minimal_penalty
+    } else if (length(ridge_penalty) == ncol(model_matrix)) {
       # Got a full length ridge_penalty, check if this conflicts with intercept
-      if(! is.null(intercept_position) && any(abs(ridge_penalty[intercept_position]) > minimal_penalty)){
-        warning("A ridge penalty for each column of the design matrix was provided, including the intercept ",
-                "in column ", intercept_position, ". Are you sure this is correct?\n",
-                "To avoid this message, set the ridge_penalty[", intercept_position, "] to a value ",
-                "smaller than '1e-10/nrow(model_matrix)'.")
+      if (!is.null(intercept_position) && any(abs(ridge_penalty[intercept_position]) > minimal_penalty)) {
+        warning(
+          "A ridge penalty for each column of the design matrix was provided, including the intercept ",
+          "in column ",
+          intercept_position,
+          ". Are you sure this is correct?\n",
+          "To avoid this message, set the ridge_penalty[",
+          intercept_position,
+          "] to a value ",
+          "smaller than '1e-10/nrow(model_matrix)'."
+        )
       }
       ridge_penalty[abs(ridge_penalty) < minimal_penalty] <- minimal_penalty
-    }else{
-      stop("The definition of the ridge penalty does not match the model_matrix. ",
-           "It must either be of length 1 or the number of columns in the design matrix.\n",
-           "If length(ridge_penalty) == 1, it is applied to all columns except the intercept.")
+    } else {
+      stop("The definition of the ridge penalty does not match the model_matrix. ", "It must either be of length 1 or the number of columns in the design matrix.\n", "If length(ridge_penalty) == 1, it is applied to all columns except the intercept.")
     }
 
-
     ridge_target <- attr(ridge_penalty, "target")
-    target_length <- if(is.matrix(ridge_penalty)) ncol(ridge_penalty) else  length(ridge_penalty)
-    if(is.null(ridge_target)){
+    target_length <- if (is.matrix(ridge_penalty)) ncol(ridge_penalty) else length(ridge_penalty)
+    if (is.null(ridge_target)) {
       ridge_target <- rep_len(0, target_length)
-    }else if(length(ridge_target) != target_length){
+    } else if (length(ridge_target) != target_length) {
       stop("Size of ridge_penalty and 'attr(ridge_penalty, \"target\") must correspond.")
     }
     attr(ridge_penalty, "target") <- ridge_target
   }
 
-
   ridge_penalty
 }
 
 
-
-
-validate_model_matrix <- function(matrix, data){
+validate_model_matrix <- function(matrix, data) {
   stopifnot(is.matrix(matrix))
   stopifnot(nrow(matrix) == ncol(data))
 }
 
 
-relevel_columns_to_reference_level <- function(col_data, reference_level = NULL){
-  if(! is.null(reference_level)){
-    has_ref_level <- vapply(col_data, function(x){
-      any(!is.na(x) & x == reference_level)
-    }, FUN.VALUE = FALSE)
-    if(all(has_ref_level == FALSE)){
+relevel_columns_to_reference_level <- function(col_data, reference_level = NULL) {
+  if (!is.null(reference_level)) {
+    has_ref_level <- vapply(
+      col_data,
+      function(x) {
+        any(!is.na(x) & x == reference_level)
+      },
+      FUN.VALUE = FALSE
+    )
+    if (all(has_ref_level == FALSE)) {
       stop("None of the columns contains the specified reference_level.")
     }
-    col_data[has_ref_level] <- lapply(col_data[has_ref_level], function(col){
-      if(is.character(col)){
+    col_data[has_ref_level] <- lapply(col_data[has_ref_level], function(col) {
+      if (is.character(col)) {
         col <- as.factor(col)
       }
       stats::relevel(col, ref = reference_level)
@@ -639,26 +662,26 @@ relevel_columns_to_reference_level <- function(col_data, reference_level = NULL)
 }
 
 
-convert_chr_vec_to_model_matrix <- function(design, reference_level){
-  if(! is.factor(design)){
+convert_chr_vec_to_model_matrix <- function(design, reference_level) {
+  if (!is.factor(design)) {
     design_fct <- as.factor(design)
-  }else{
+  } else {
     design_fct <- design
   }
 
-  if(length(levels(design_fct)) == 1){
+  if (length(levels(design_fct)) == 1) {
     helper_df <- data.frame(x_ = design_fct)
-    tmp <- convert_formula_to_model_matrix(~ 1, col_data = helper_df)
+    tmp <- convert_formula_to_model_matrix(~1, col_data = helper_df)
     mm <- tmp$model_matrix
     formula <- tmp$formula
     colnames(mm) <- levels(design_fct)
-  }else if(is.null(reference_level)){
+  } else if (is.null(reference_level)) {
     helper_df <- data.frame(x_ = design_fct)
     tmp <- convert_formula_to_model_matrix(~ x_ - 1, col_data = helper_df)
     mm <- tmp$model_matrix
     formula <- tmp$formula
     colnames(mm) <- sub("^x_", "", colnames(mm))
-  }else{
+  } else {
     design_fct <- stats::relevel(design_fct, ref = reference_level)
     helper_df <- data.frame(x_ = design_fct)
     tmp <- convert_formula_to_model_matrix(~ x_ + 1, col_data = helper_df)
@@ -670,24 +693,25 @@ convert_chr_vec_to_model_matrix <- function(design, reference_level){
   list(formula = formula, model_matrix = mm)
 }
 
-convert_formula_to_model_matrix <- function(formula, col_data){
+convert_formula_to_model_matrix <- function(formula, col_data) {
   attr(col_data, "na.action") <- "na.pass"
-  tryCatch({
-    mf <- model.frame(formula, data = col_data, drop.unused.levels = TRUE)
-    terms <- attr(mf, "terms")
-    attr(terms, "xlevels") <- stats::.getXlevels(terms, mf)
-    mm <- stats::model.matrix.default(terms, mf)
-  }, error = function(e){
-    # Try to extract text from error message
-    match <- regmatches(e$message, regexec("object '(.+)' not found", e$message))[[1]]
-    if(length(match) == 2){
-      stop("Error while parsing the formula (", formula, ").\n",
-           "Variable '", match[2], "' not found in col_data or global environment. Possible variables are:\n",
-           paste0(colnames(col_data), collapse = ", "), call. = FALSE)
-    }else{
-      stop(e$message)
+  tryCatch(
+    {
+      mf <- model.frame(formula, data = col_data, drop.unused.levels = TRUE)
+      terms <- attr(mf, "terms")
+      attr(terms, "xlevels") <- stats::.getXlevels(terms, mf)
+      mm <- stats::model.matrix.default(terms, mf)
+    },
+    error = function(e) {
+      # Try to extract text from error message
+      match <- regmatches(e$message, regexec("object '(.+)' not found", e$message))[[1]]
+      if (length(match) == 2) {
+        stop("Error while parsing the formula (", formula, ").\n", "Variable '", match[2], "' not found in col_data or global environment. Possible variables are:\n", paste0(colnames(col_data), collapse = ", "), call. = FALSE)
+      } else {
+        stop(e$message)
+      }
     }
-  })
+  )
 
   # Otherwise every copy of the model stores the whole global environment!
   attr(terms, ".Environment") <- c()
@@ -695,10 +719,9 @@ convert_formula_to_model_matrix <- function(formula, col_data){
   list(formula = terms, model_matrix = mm)
 }
 
-extract_data_from_formula <- function(formula, col_data, encl = parent.frame()){
-  if(length(formula) < 3){
-    stop("The formula does not have a left hand side. Please call this function like this:\n",
-         "'glm_gp(data = mat, design = ~ a + b + c, ...)'", call. = FALSE)
+extract_data_from_formula <- function(formula, col_data, encl = parent.frame()) {
+  if (length(formula) < 3) {
+    stop("The formula does not have a left hand side. Please call this function like this:\n", "'glm_gp(data = mat, design = ~ a + b + c, ...)'", call. = FALSE)
   }
   data <- eval(formula[[2]], envir = col_data, enclos = encl)
   formula[[2]] <- NULL
@@ -706,7 +729,7 @@ extract_data_from_formula <- function(formula, col_data, encl = parent.frame()){
 }
 
 
-is_on_disk.glmGamPoi2 <- function(fit){
+is_on_disk.glmGamPoi2 <- function(fit) {
   is(fit$Mu, "DelayedMatrix") && is(DelayedArray::seed(fit$Mu), "HDF5ArraySeed")
 }
 
@@ -714,7 +737,14 @@ is_on_disk.glmGamPoi2 <- function(fit){
 filt <- function(x, i, j, ...) {
   # subset by observations
   if (!missing(j) && !is.null(j)) {
-    j <- handle_sub_param(if (is.null(colnames(x[["data"]]))) { ncol(x[["data"]]) } else { colnames(x[["data"]]) }, j)
+    j <- handle_sub_param(
+      if (is.null(colnames(x[["data"]]))) {
+        ncol(x[["data"]])
+      } else {
+        colnames(x[["data"]])
+      },
+      j
+    )
 
     x[["data"]] <- x[["data"]][, j]
 
@@ -744,7 +774,14 @@ filt <- function(x, i, j, ...) {
 
   # subset by gene
   if (!missing(i) && !is.null(i)) {
-    i <- handle_sub_param(if (is.null(rownames(x[["data"]]))) { nrow(x[["data"]]) } else { rownames(x[["data"]]) }, i)
+    i <- handle_sub_param(
+      if (is.null(rownames(x[["data"]]))) {
+        nrow(x[["data"]])
+      } else {
+        rownames(x[["data"]])
+      },
+      i
+    )
 
     x[["data"]] <- x[["data"]][i, ]
 
