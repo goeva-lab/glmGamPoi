@@ -32,7 +32,7 @@ The core design aims of `gmlGamPoi` are:
 * Make integration into other tools easy
 
 
-# Installation
+## Installation
 
 You can install the release version of `r BiocStyle::Biocpkg("glmGamPoi")` from BioConductor:
 
@@ -46,7 +46,7 @@ BiocManager::install("glmGamPoi")
 For the latest developments, see the `r BiocStyle::Githubpkg("const-ae/glmGamPoi", "GitHub")` repo.
 
 
-# Example
+## Example
 
 Load the glmGamPoi package
 
@@ -59,10 +59,10 @@ To fit a single Gamma-Poisson GLM do:
 
 ```{r}
 # overdispersion = 1/size
-counts <- rnbinom(n = 10, mu = 5, size = 1/0.7)
+counts <- rnbinom(n = 10, mu = 5, size = 1 / 0.7)
 
 # design = ~ 1 means that an intercept-only model is fit
-fit <- glm_gp(counts, design = ~ 1)
+fit <- glm_gp(counts, design = ~1)
 fit
 
 # Internally fit is just a list:
@@ -99,7 +99,7 @@ summary(fit)
 
 
 
-# Benchmark
+## Benchmark
 
 I compare my method (in-memory and on-disk) with `r BiocStyle::Biocpkg("DESeq2")` and `r BiocStyle::Biocpkg("edgeR")`. Both are classical methods for analyzing RNA-Seq datasets and have been around for almost 10 years. Note that both tools can do a lot more than just fitting the Gamma-Poisson model, so this benchmark only serves to give a general impression of the performance.
 
@@ -118,8 +118,9 @@ bench::mark(
     glm_gp(pbmcs_subset, design = model_matrix, on_disk = TRUE)
   }, DESeq2 = suppressMessages({
     dds <- DESeq2::DESeqDataSetFromMatrix(pbmcs_subset,
-                        colData = data.frame(name = seq_len(4340)),
-                        design = ~ 1)
+      colData = data.frame(name = seq_len(4340)),
+      design = ~1
+    )
     dds <- DESeq2::estimateSizeFactors(dds, "poscounts")
     dds <- DESeq2::estimateDispersions(dds, quiet = TRUE)
     dds <- DESeq2::nbinomWaldTest(dds, minmu = 1e-6)
@@ -141,14 +142,15 @@ To demonstrate that the method does not sacrifice accuracy, I compare the parame
 fit <- glm_gp(pbmcs_subset, design = model_matrix, on_disk = FALSE)
 
 # DESeq2
-dds <- DESeq2::DESeqDataSetFromMatrix(pbmcs_subset, 
-                        colData = data.frame(name = seq_len(4340)),
-                        design = ~ 1)
-sizeFactors(dds)  <- fit$size_factors
+dds <- DESeq2::DESeqDataSetFromMatrix(pbmcs_subset,
+  colData = data.frame(name = seq_len(4340)),
+  design = ~1
+)
+sizeFactors(dds) <- fit$size_factors
 dds <- DESeq2::estimateDispersions(dds, quiet = TRUE)
 dds <- DESeq2::nbinomWaldTest(dds, minmu = 1e-6)
 
-#edgeR
+# edgeR
 edgeR_data <- edgeR::DGEList(pbmcs_subset, lib.size = fit$size_factors)
 edgeR_data <- edgeR::estimateDisp(edgeR_data, model_matrix)
 edgeR_fit <- edgeR::glmFit(edgeR_data, design = model_matrix)
@@ -157,27 +159,38 @@ edgeR_fit <- edgeR::glmFit(edgeR_data, design = model_matrix)
 
 ```{r coefficientComparison, fig.height=5, fig.width=10, warning=FALSE, echo = FALSE}
 par(mfrow = c(2, 4), cex.main = 2, cex.lab = 1.5)
-plot(fit$Beta[,1], coef(dds)[,1] / log2(exp(1)), pch = 16, 
-     main = "Beta Coefficients", xlab = "glmGamPoi", ylab = "DESeq2")
-abline(0,1)
-plot(fit$Beta[,1], edgeR_fit$unshrunk.coefficients[,1], pch = 16,
-     main = "Beta Coefficients", xlab = "glmGamPoi", ylab = "edgeR")
-abline(0,1)
+plot(fit$Beta[, 1], coef(dds)[, 1] / log2(exp(1)),
+  pch = 16,
+  main = "Beta Coefficients", xlab = "glmGamPoi", ylab = "DESeq2"
+)
+abline(0, 1)
+plot(fit$Beta[, 1], edgeR_fit$unshrunk.coefficients[, 1],
+  pch = 16,
+  main = "Beta Coefficients", xlab = "glmGamPoi", ylab = "edgeR"
+)
+abline(0, 1)
 
-plot(fit$Mu[,1], assay(dds, "mu")[,1], pch = 16, log="xy",
-     main = "Gene Mean", xlab = "glmGamPoi", ylab = "DESeq2")
-abline(0,1)
-plot(fit$Mu[,1], edgeR_fit$fitted.values[,1], pch = 16, log="xy",
-     main = "Gene Mean", xlab = "glmGamPoi", ylab = "edgeR")
-abline(0,1)
+plot(fit$Mu[, 1], assay(dds, "mu")[, 1],
+  pch = 16, log = "xy",
+  main = "Gene Mean", xlab = "glmGamPoi", ylab = "DESeq2"
+)
+abline(0, 1)
+plot(fit$Mu[, 1], edgeR_fit$fitted.values[, 1],
+  pch = 16, log = "xy",
+  main = "Gene Mean", xlab = "glmGamPoi", ylab = "edgeR"
+)
+abline(0, 1)
 
-plot(fit$overdispersions, rowData(dds)$dispGeneEst, pch = 16, log="xy",
-     main = "Overdispersion", xlab = "glmGamPoi", ylab = "DESeq2")
-abline(0,1)
-plot(fit$overdispersions, edgeR_fit$dispersion, pch = 16, log="xy",
-     main = "Overdispersion", xlab = "glmGamPoi", ylab = "edgeR")
-abline(0,1)
-
+plot(fit$overdispersions, rowData(dds)$dispGeneEst,
+  pch = 16, log = "xy",
+  main = "Overdispersion", xlab = "glmGamPoi", ylab = "DESeq2"
+)
+abline(0, 1)
+plot(fit$overdispersions, edgeR_fit$dispersion,
+  pch = 16, log = "xy",
+  main = "Overdispersion", xlab = "glmGamPoi", ylab = "edgeR"
+)
+abline(0, 1)
 ```
 
 I am comparing the gene-wise estimates of the coefficients from all three methods. Points on the diagonal line are identical. The inferred Beta coefficients and gene means agree well between the methods, however the overdispersion differs quite a bit. `DESeq2` has problems estimating most of the overdispersions and sets them to `1e-8`. `edgeR` only approximates the overdispersions which explains the variation around the overdispersions calculated with `glmGamPoi`. 
@@ -202,11 +215,15 @@ For demonstration purpose, I will work on a subset of the genes and cells:
 ```{r}
 set.seed(1)
 # Take highly expressed genes and proper cells:
-sce_subset <- sce[rowSums(counts(sce)) > 100, 
-                  sample(which(sce$multiplets == "singlet" & 
-                              ! is.na(sce$cell) &
-                              sce$cell %in% c("CD4 T cells", "B cells", "NK cells")), 
-                         1000)]
+sce_subset <- sce[
+  rowSums(counts(sce)) > 100,
+  sample(
+    which(sce$multiplets == "singlet" &
+      !is.na(sce$cell) &
+      sce$cell %in% c("CD4 T cells", "B cells", "NK cells")),
+    1000
+  )
+]
 # Convert counts to dense matrix
 counts(sce_subset) <- as.matrix(counts(sce_subset))
 # Remove empty levels because glm_gp() will complain otherwise
@@ -216,8 +233,10 @@ sce_subset$cell <- droplevels(sce_subset$cell)
 We will identify which genes in CD4 positive T-cells are changed most by the treatment. We will fit a full model including the interaction term `stim:cell`. The interaction term will help us identify cell type specific responses to the treatment:
 
 ```{r}
-fit <- glm_gp(sce_subset, design = ~ cell + stim +  stim:cell - 1,
-              reference_level = "NK cells")
+fit <- glm_gp(sce_subset,
+  design = ~ cell + stim + stim:cell - 1,
+  reference_level = "NK cells"
+)
 summary(fit)
 ```
 
@@ -237,8 +256,10 @@ In our example, we want to find the genes that change specifically in T cells. F
 #
 # There is no sample label in the colData, so we create it on the fly
 # from `stim` and `ind` columns in colData(fit$data).
-de_res <- test_de(fit, contrast = `stimstim` + `cellCD4 T cells:stimstim`, 
-                  pseudobulk_by = paste0(stim, "-", ind)) 
+de_res <- test_de(fit,
+  contrast = `stimstim` + `cellCD4 T cells:stimstim`,
+  pseudobulk_by = paste0(stim, "-", ind)
+)
 
 # The large `lfc` values come from groups were nearly all counts are 0
 # Setting them to Inf makes the plots look nicer
@@ -272,9 +293,10 @@ head(marker_genes)
 If we want find genes that differ in the stimulated condition, we just include the additional coefficients in the contrast:
 
 ```{r}
-marker_genes2 <- test_de(fit, (`cellCD4 T cells` + `cellCD4 T cells:stimstim`) - 
-                               (`cellB cells` + `cellB cells:stimstim`), 
-                        sort_by = pval)
+marker_genes2 <- test_de(fit, (`cellCD4 T cells` + `cellCD4 T cells:stimstim`) -
+  (`cellB cells` + `cellB cells:stimstim`),
+sort_by = pval
+)
 
 head(marker_genes2)
 ```
@@ -285,29 +307,21 @@ A note of caution: applying `test_de()` to single cell data without the pseudobu
 
 ```{r}
 # Create a data.frame with the expression values, gene names, and cell types
-tmp <- data.frame(gene = rep(marker_genes$name[1:6], times = ncol(sce_subset)),
-                  expression = c(counts(sce_subset)[marker_genes$name[1:6], ]),
-                  celltype = rep(sce_subset$cell, each = 6))
+tmp <- data.frame(
+  gene = rep(marker_genes$name[1:6], times = ncol(sce_subset)),
+  expression = c(counts(sce_subset)[marker_genes$name[1:6], ]),
+  celltype = rep(sce_subset$cell, each = 6)
+)
 
 ggplot(tmp, aes(x = celltype, y = expression)) +
   geom_jitter(height = 0.1) +
   stat_summary(geom = "crossbar", fun = "mean", color = "red") +
-  facet_wrap(~ gene, scales = "free_y") +
+  facet_wrap(~gene, scales = "free_y") +
   ggtitle("Marker genes of B vs. T cells")
 ```
-
-
-
-
-
-
-
 
 # Session Info
 
 ```{r}
 sessionInfo()
 ```
-
-
-

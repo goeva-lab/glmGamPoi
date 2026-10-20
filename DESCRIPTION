@@ -6,7 +6,9 @@ Authors@R: c(person("Constantin", "Ahlmann-Eltze", email = "artjom31415@googlema
                     role = c("aut", "cre"), comment = c(ORCID = "0000-0002-3762-068X")),
              person("Nathan", "Lubock", email="lubock.nathan@gmail.com", role = "ctb", 
                     comment = c(ORCID = "0000-0001-8064-2465")),
-             person("Michael", "Love", email="michaelisaiahlove@gmail.com", role = "ctb"))
+             person("Michael", "Love", email="michaelisaiahlove@gmail.com", role = "ctb"),
+             person("namemcguffin", email = "52169277+namemcguffin@users.noreply.github.com", role = c("ctb", "cre")),
+             person("Goeva Lab", email = "aleksandrina.goeva@utoronto.ca", role = c("fnd"), comment = c(fnd = "funded work by @namemcguffin")))
 Description: Fit linear models to overdispersed count data.
      The package can estimate the overdispersion and fit repeated models
      for matrix input. It is designed to handle large input datasets as they
@@ -58,8 +60,8 @@ Imports:
     rlang,
     vctrs
 Roxygen: list(markdown = TRUE)
-URL: https://github.com/const-ae/glmGamPoi
-BugReports: https://github.com/const-ae/glmGamPoi/issues
+URL: https://github.com/goeva-lab/glmGamPoi
+BugReports: https://github.com/goeva-lab/glmGamPoi/issues
 biocViews: Regression, RNASeq, Software, SingleCell
 VignetteBuilder: knitr
 Config/roxygen2/version: 8.0.0
