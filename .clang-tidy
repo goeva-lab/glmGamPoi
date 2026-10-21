@@ -1,0 +1,27 @@
+---
+Checks:
+  - 'clang-analyzer-*'
+WarningsAsErrors: ''
+HeaderFileExtensions:
+  - 'h'
+  - 'hh'
+  - 'hpp'
+  - 'hxx'
+FormatStyle: 'file'
+ImplementationFileExtensions:
+  - 'c'
+  - 'cc'
+  - 'cpp'
+  - 'cxx'
+ExtraArgsBefore:
+  - '-xc++'
+ExtraArgs:
+  - '-I./inst/include'
+  - '-I/usr/include/R/'
+  - '-I/usr/lib/R/library/Rcpp/include'
+  - '-I/usr/lib/R/library/RcppEigen/include'
+  - '-I/usr/lib/R/library/beachmat/include'
+  - '-I/usr/lib/R/library/assorthead/include'
+  - '-std=c++17'
+CheckOptions: {}
+...

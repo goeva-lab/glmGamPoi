@@ -224,7 +224,8 @@ inline double conventional_deriv_score_function_fast_impl(const EMB<D1> &y, cons
 }
 
 // not using Eigen::MatrixBase as base class here to have access to resize method
-template <class V1, class V2, class V3> inline void make_map_if_small(V1 &unique_counts_out, V2 &freqs_out, const V3 &x, const size_t stop_if_larger) {
+template <class V1, class V2, class V3>
+inline void make_map_if_small(V1 &unique_counts_out, V2 &freqs_out, const V3 &x, const size_t stop_if_larger) {
   std::unordered_map<double, double> count_tab;
   count_tab.reserve(stop_if_larger);
   for (auto v : x) {

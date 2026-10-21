@@ -9,7 +9,8 @@
 #include <utility> // for std::as_const
 
 #include <Eigen/Dense>
-template <class D> using EMB = Eigen::MatrixBase<D>;
+template <class D> using EMB 
+= Eigen::MatrixBase<D>;
 using Eigen::ArrayXd;
 using Eigen::VectorXd;
 
@@ -78,7 +79,7 @@ public:
   }
   template <class D1, class D2, class D3, class D4, class D5>
   inline VectorXd fs_step(const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &mu, const EMB<D4> &theta_times_mu,
-                              const EMB<D5> &beta_hat) const {
+                          const EMB<D5> &beta_hat) const {
     return fisher_scoring_qr_step(model_matrix, counts, mu, theta_times_mu);
   }
 };
@@ -101,7 +102,7 @@ public:
   }
   template <class D4, class D5, class D6, class D7, class D8>
   inline VectorXd fs_step(const EMB<D4> &model_matrix, const EMB<D5> &counts, const EMB<D6> &mu, const EMB<D7> &theta_times_mu,
-                              const EMB<D8> &beta_hat) const {
+                          const EMB<D8> &beta_hat) const {
     return fisher_scoring_qr_ridge_step(model_matrix, counts, mu, theta_times_mu, ridge_penalty_, ridge_target_, beta_hat);
   }
 };
@@ -114,7 +115,7 @@ public:
   }
   template <class D1, class D2, class D3, class D4, class D5>
   inline VectorXd fs_step(const EMB<D1> &model_matrix, const EMB<D2> &counts, const EMB<D3> &mu, const EMB<D4> &theta_times_mu,
-                              const EMB<D5> &beta_hat) const {
+                          const EMB<D5> &beta_hat) const {
     return fisher_scoring_diagonal_step(model_matrix, counts, mu, theta_times_mu);
   }
 };
@@ -168,19 +169,19 @@ inline void fitBeta_FS_optim_step(
     const double theta, const int max_iter) {
   LBFGSpp::LBFGSParam params;
   params.max_iterations = max_iter;
-  
+
   // using delta-based stopping condition instead of gradient value
   params.epsilon = 0;
   params.epsilon_rel = 0;
   params.past = 1;
   params.delta = 1e-12;
 
-  params.max_step = 32.; 
+  params.max_step = 32.;
 
   // nocedal-wright linesearch often fails to find a sufficiently decreasing value, using a different one instead
   // moreover, we don't want to enforce the wolfe condition here given potential instability
   // of our numerically approximated derivative, and nocedal-wright is only compatible w/ the wolfe condition
-  // as such, we enforce only the armijo (sufficient decrease) condition, use a plain bracketing line search, and 
+  // as such, we enforce only the armijo (sufficient decrease) condition, use a plain bracketing line search, and
   // set a very generous sufficient decrease line search tolerance
   params.linesearch = LBFGSpp::LBFGS_LINESEARCH_BACKTRACKING_ARMIJO;
   params.max_linesearch = 1000;
