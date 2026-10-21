@@ -8,3 +8,5 @@ inst/doc
 
 man/
 NAMESPACE
+
+R/RcppExports.R
