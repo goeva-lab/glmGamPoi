@@ -168,7 +168,7 @@ format_matrix <- function(matrix, digits = NULL) {
   }
   offset <- max(nchar(rownames), 0)
   char_matrix <- vapply(
-    seq_len(length(colnames)),
+    seq_along(colnames),
     function(col_idx) {
       format(matrix[, col_idx], digits = digits)
     },
@@ -178,7 +178,7 @@ format_matrix <- function(matrix, digits = NULL) {
     char_matrix <- matrix(char_matrix, nrow = 1)
   }
   width_per_col <- vapply(
-    seq_len(length(colnames)),
+    seq_along(colnames),
     function(col_idx) {
       max(nchar(char_matrix[, col_idx]), 0)
     },
@@ -187,7 +187,7 @@ format_matrix <- function(matrix, digits = NULL) {
   width_per_header <- nchar(colnames)
   width_per_col <- pmax(width_per_col, width_per_header)
   adapted_colnames <- vapply(
-    seq_len(length(colnames)),
+    seq_along(colnames),
     function(col_idx) {
       format(colnames[col_idx], width = width_per_col[col_idx], justify = "right")
     },
@@ -195,11 +195,11 @@ format_matrix <- function(matrix, digits = NULL) {
   )
   head_line <- paste0(c(format("", width = offset), adapted_colnames), collapse = " ")
   rows_pasted <- vapply(
-    seq_len(length(rownames)),
+    seq_along(rownames),
     function(row_idx) {
       paste0(
         vapply(
-          seq_len(length(colnames)),
+          seq_along(colnames),
           function(col_idx) {
             format(char_matrix[row_idx, col_idx], width = width_per_col[col_idx], justify = "right")
           },
@@ -211,7 +211,7 @@ format_matrix <- function(matrix, digits = NULL) {
     FUN.VALUE = ""
   )
   adapted_rownames <- vapply(
-    seq_len(length(rownames)),
+    seq_along(rownames),
     function(row_idx) {
       format(rownames[row_idx], width = offset, justify = "right")
     },

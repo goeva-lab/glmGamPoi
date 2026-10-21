@@ -218,9 +218,7 @@ set.seed(1)
 sce_subset <- sce[
   rowSums(counts(sce)) > 100,
   sample(
-    which(sce$multiplets == "singlet" &
-      !is.na(sce$cell) &
-      sce$cell %in% c("CD4 T cells", "B cells", "NK cells")),
+    which(sce$multiplets == "singlet" & !is.na(sce$cell) & sce$cell %in% c("CD4 T cells", "B cells", "NK cells")),
     1000
   )
 ]
@@ -293,10 +291,7 @@ head(marker_genes)
 If we want find genes that differ in the stimulated condition, we just include the additional coefficients in the contrast:
 
 ```{r}
-marker_genes2 <- test_de(fit, (`cellCD4 T cells` + `cellCD4 T cells:stimstim`) -
-  (`cellB cells` + `cellB cells:stimstim`),
-sort_by = pval
-)
+marker_genes2 <- test_de(fit, (`cellCD4 T cells` + `cellCD4 T cells:stimstim`) - (`cellB cells` + `cellB cells:stimstim`), sort_by = pval)
 
 head(marker_genes2)
 ```

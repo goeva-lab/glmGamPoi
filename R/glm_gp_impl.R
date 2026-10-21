@@ -254,7 +254,7 @@ validate_Y_matrix <- function(Y) {
 
 get_groups_for_model_matrix <- function(model_matrix) {
   if (!lte_n_equal_rows(model_matrix, ncol(model_matrix))) {
-    return(NULL)
+    NULL
   } else {
     get_row_groups(model_matrix, n_groups = ncol(model_matrix))
   }

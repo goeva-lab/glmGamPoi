@@ -292,7 +292,7 @@ test_de_q <- function(
       pred <- predict(
         fit,
         se.fit = TRUE,
-        type = 'link',
+        type = "link",
         offset = 0, #for asserting equality with lfc
         newdata = matrix(cntrst, nrow = 1),
         verbose = verbose,
