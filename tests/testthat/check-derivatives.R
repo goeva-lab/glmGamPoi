@@ -1,3 +1,5 @@
+# jarl-ignore empty_file:>
+
 # ## This file checks all the loglikelihood, score, derivative of score functions and makes
 # ## sure that they are correct
 #

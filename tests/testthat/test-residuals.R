@@ -129,9 +129,9 @@ test_that("residuals are never NA", {
 
   fit <- glm_gp(Y, size_factors = FALSE)
 
-  expect_true(all(!is.na(residuals(fit, "deviance"))))
-  expect_true(all(!is.na(residuals(fit, "pearson"))))
-  expect_true(all(!is.na(residuals(fit, "randomized_quantile"))))
-  expect_true(all(!is.na(residuals(fit, "working"))))
-  expect_true(all(!is.na(residuals(fit, "response"))))
+  expect_true(!anyNA(residuals(fit, "deviance")))
+  expect_true(!anyNA(residuals(fit, "pearson")))
+  expect_true(!anyNA(residuals(fit, "randomized_quantile")))
+  expect_true(!anyNA(residuals(fit, "working")))
+  expect_true(!anyNA(residuals(fit, "response")))
 })

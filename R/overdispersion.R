@@ -151,9 +151,9 @@ overdispersion_mle_impl <- function(y, mu, model_matrix, do_cox_reid_adjustment,
   }
 
   stopifnot(is.vector(y) && length(y) == length(mu))
-  stopifnot(all(!is.na(y))) # Cannot handle missing values
+  stopifnot(!anyNA(y)) # Cannot handle missing values
   stopifnot(all(y >= 0))
-  stopifnot(all(!is.na(mu)))
+  stopifnot(!anyNA(mu))
   stopifnot(all(mu >= 0))
   stopifnot(all(is.finite(y)))
   stopifnot(all(is.finite(mu)))
