@@ -1,5 +1,4 @@
-
-# glmGamPoi <img src="./man/figures/logo.svg" alt="logo" height="128" align="right"/>
+# glmGamPoi <img src="./vignettes/img/logo.svg" alt="logo" height="128" align="right"/>
 
 > Fit Gamma-Poisson Generalized Linear Models Reliably.
 \
@@ -13,7 +12,7 @@ Pronounciation: [`dʒi əl əm ɡam ˈpwɑ`](http://ipa-reader.com/?text=d%CA%92
 The core design aims of `glmGamPoi` are:
 
 - Fit Gamma-Poisson models on arbitrarily large or small datasets
-- Be faster than alternative methods, such as `DESeq2` or `edgeR`
+- Be faster and more memory efficient than alternative methods, such as `DESeq2` or `edgeR`
 - Calculate exact or approximate results based on user preference
 - Support in-memory or on-disk data
 - Follow established conventions around tools for RNA-seq analysis
@@ -23,21 +22,22 @@ The core design aims of `glmGamPoi` are:
 
 ## Installation
 
-You can install the release version of
-*[glmGamPoi](https://bioconductor.org/packages/glmGamPoi)* from
-BioConductor:
+You can build and install [`glmGamPoi2`](https://github.com/goeva-lab/glmGamPoi) from the automatically automatically built package archive published from the latest [GitHub release](https://github.com/goeva-lab/glmGamPoi/releases/latest/download/glmGamPoi.tar.gz).
 
-``` r
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
+This can be done using the [`withr`](https://withr.r-lib.org/) (to guarantee a maximally optimized build) and [`pak`](https://pak.r-lib.org/) (for installation) R packages via the following snippet:
 
-BiocManager::install("glmGamPoi")
+```R
+shared_flags <- "-fuse-ld=lld -flto -ffat-lto-objects -fopenmp"
+withr::with_makevars(assignment = "=", c(
+    CXX17STD = "-std=c++17",
+    CXX17FLAGS = sprintf("%s -O3 -march=native", shared_flags),
+    LDFLAGS = sprintf("%s -L/usr/lib64/R/lib -Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs", shared_flags)
+), {
+    pak::pak("url::https://github.com/goeva-lab/glmGamPoi/releases/latest/download/glmGamPoi2.tar.gz")
+})
 ```
 
-For the latest developments, see the
-*[GitHub](https://github.com/const-ae/glmGamPoi)* repo.
-
-If you use this package in a scientific publication, please cite:
+If you use this package in a scientific publication, please make sure to cite the original [glmGamPoi publication](https://doi.org/10.1093/bioinformatics/btaa1009):
 
 > glmGamPoi: Fitting Gamma-Poisson Generalized Linear Models on Single
 > Cell Count Data  
@@ -47,290 +47,19 @@ If you use this package in a scientific publication, please cite:
 
 ## Example
 
-Load the glmGamPoi package
+An example of library use can be seen below:
 
-``` r
-library(glmGamPoi)
-```
+```R
+library(glmGamPoi2)
 
-To fit a single Gamma-Poisson GLM do:
-
-``` r
-# overdispersion = 1/size
 counts <- rnbinom(n = 10, mu = 5, size = 1/0.7)
 
 # design = ~ 1 means that an intercept-only model is fit
 fit <- glm_gp(counts, design = ~ 1)
-fit
-
-# Internally fit is just a list:
-as.list(fit)[1:2]
-```
-
-The `glm_gp()` function returns a list with the results of the fit. Most
-importantly, it contains the estimates for the coefficients β and the
-overdispersion.
-
-Fitting repeated Gamma-Poisson GLMs for each gene of a single cell
-dataset is just as easy:
-
-I will first load an example dataset using the `TENxPBMCData` package.
-The dataset has 33,000 genes and 4340 cells. It takes roughly 1.5
-minutes to fit the Gamma-Poisson model on the full dataset. For
-demonstration purposes, I will subset the dataset to 300 genes, but keep
-the 4340 cells:
-
-``` r
-library(SummarizedExperiment)
-library(DelayedMatrixStats)
-```
-
-``` r
-# The full dataset with 33,000 genes and 4340 cells
-# The first time this is run, it will download the data
-pbmcs <- TENxPBMCData::TENxPBMCData("pbmc4k")
-
-# I want genes where at least some counts are non-zero
-non_empty_rows <- which(rowSums2(assay(pbmcs)) > 0)
-pbmcs_subset <- pbmcs[sample(non_empty_rows, 300), ]
-pbmcs_subset
-```
-
-I call `glm_gp()` to fit one GLM model for each gene and force the
-calculation to happen in memory.
-
-``` r
-fit <- glm_gp(pbmcs_subset, on_disk = FALSE)
-summary(fit)
-```
-
-## Benchmark
-
-I compare my method (in-memory and on-disk) with
-*[DESeq2](https://bioconductor.org/packages/release/DESeq2)* and
-*[edgeR](https://bioconductor.org/packages/release/edgeR)*. Both are
-classical methods for analyzing RNA-Seq datasets and have been around
-for almost 10 years. Note that both tools can do a lot more than just
-fitting the Gamma-Poisson model, so this benchmark only serves to give a
-general impression of the performance.
-
-``` r
-# Explicitly realize count matrix in memory so that it is a fair comparison
-pbmcs_subset <- as.matrix(assay(pbmcs_subset))
-model_matrix <- matrix(1, nrow = ncol(pbmcs_subset))
-
-
-bench::mark(
-  glmGamPoi_in_memory = {
-    glm_gp(pbmcs_subset, design = model_matrix, on_disk = FALSE)
-  }, glmGamPoi_on_disk = {
-    glm_gp(pbmcs_subset, design = model_matrix, on_disk = TRUE)
-  }, DESeq2 = suppressMessages({
-    dds <- DESeq2::DESeqDataSetFromMatrix(pbmcs_subset,
-                        colData = data.frame(name = seq_len(4340)),
-                        design = ~ 1)
-    dds <- DESeq2::estimateSizeFactors(dds, "poscounts")
-    dds <- DESeq2::estimateDispersions(dds, quiet = TRUE)
-    dds <- DESeq2::nbinomWaldTest(dds, minmu = 1e-6)
-  }), edgeR = {
-    edgeR_data <- edgeR::DGEList(pbmcs_subset)
-    edgeR_data <- edgeR::calcNormFactors(edgeR_data)
-    edgeR_data <- edgeR::estimateDisp(edgeR_data, model_matrix)
-    edgeR_fit <- edgeR::glmFit(edgeR_data, design = model_matrix)
-  }, check = FALSE, min_iterations = 3
-)
-```
-
-On this dataset, `glmGamPoi` is more than 5 times faster than `edgeR`
-and more than 18 times faster than `DESeq2`. `glmGamPoi` does **not**
-use approximations to achieve this performance increase. The performance
-comes from an optimized algorithm for inferring the overdispersion for
-each gene. It is tuned for datasets typically encountered in single
-RNA-seq with many samples and many small counts, by avoiding duplicate
-calculations.
-
-To demonstrate that the method does not sacrifice accuracy, I compare
-the parameters that each method estimates. The means and β coefficients
-are identical, but that the overdispersion estimates from `glmGamPoi`
-are more reliable:
-
-``` r
-# Results with my method
-fit <- glm_gp(pbmcs_subset, design = model_matrix, on_disk = FALSE)
-
-# DESeq2
-dds <- DESeq2::DESeqDataSetFromMatrix(pbmcs_subset, 
-                        colData = data.frame(name = seq_len(4340)),
-                        design = ~ 1)
-sizeFactors(dds)  <- fit$size_factors
-dds <- DESeq2::estimateDispersions(dds, quiet = TRUE)
-dds <- DESeq2::nbinomWaldTest(dds, minmu = 1e-6)
-
-#edgeR
-edgeR_data <- edgeR::DGEList(pbmcs_subset, lib.size = fit$size_factors)
-edgeR_data <- edgeR::estimateDisp(edgeR_data, model_matrix)
-edgeR_fit <- edgeR::glmFit(edgeR_data, design = model_matrix)
-```
-
-I am comparing the gene-wise estimates of the coefficients from all
-three methods. Points on the diagonal line are identical. The inferred
-Beta coefficients and gene means agree well between the methods, however
-the overdispersion differs quite a bit. `DESeq2` has problems estimating
-most of the overdispersions and sets them to `1e-8`. `edgeR` only
-approximates the overdispersions which explains the variation around the
-overdispersions calculated with `glmGamPoi`.
-
-## Scalability
-
-The method scales linearly, with the number of rows and columns in the
-dataset. For example: fitting the full `pbmc4k` dataset with subsampling
-on a modern MacBook Pro in-memory takes \~1 minute and on-disk a little
-over 4 minutes. Fitting the `pbmc68k` (17x the size) takes \~73 minutes
-(17x the time) on-disk.
-
-## Differential expression analysis
-
-`glmGamPoi` provides an interface to do quasi-likelihood ratio testing
-to identify differentially expressed genes. To demonstrate this feature,
-we will use the data from [Kang *et al.*
-(2018)](https://www.ncbi.nlm.nih.gov/pubmed/29227470) provided by the
-`MuscData` package. This is a single cell dataset of 8 Lupus patients
-for which 10x droplet-based scRNA-seq was performed before and after
-treatment with interferon beta. The `SingleCellExperiment` object
-conveniently provides the patient id (`ind`), treatment status (`stim`)
-and cell type (`cell`):
-
-``` r
-sce <- muscData::Kang18_8vs8()
-colData(sce)
-```
-
-For demonstration purpose, I will work on a subset of the genes and
-cells:
-
-``` r
-set.seed(1)
-# Take highly expressed genes and proper cells:
-sce_subset <- sce[rowSums(counts(sce)) > 100, 
-                  sample(which(sce$multiplets == "singlet" & 
-                              ! is.na(sce$cell) &
-                              sce$cell %in% c("CD4 T cells", "B cells", "NK cells")), 
-                         1000)]
-# Convert counts to dense matrix
-counts(sce_subset) <- as.matrix(counts(sce_subset))
-# Remove empty levels because glm_gp() will complain otherwise
-sce_subset$cell <- droplevels(sce_subset$cell)
-```
-
-In the first step we will aggregate the counts of each patient,
-condition and cell type and form pseudobulk samples. This ensures that I
-get reliable p-value by treating each patient as a replicate and not
-each cell.
-
-``` r
-sce_reduced <- pseudobulk(sce_subset, group_by = vars(ind, stim, cell))
-```
-
-We will identify which genes in CD4 positive T-cells are changed most by
-the treatment. We will fit a full model including the interaction term
-`stim:cell`. The interaction term will help us identify cell type
-specific responses to the treatment:
-
-``` r
-fit <- glm_gp(sce_reduced, design = ~ cell + stim +  stim:cell - 1,
-              reference_level = "NK cells")
-summary(fit)
-```
-
-To see how the coefficient of our model are called, we look at the
-`colnames(fit$Beta)`:
-
-``` r
-colnames(fit$Beta)
-```
-
-In our example, we want to find the genes that change specifically in T
-cells. Finding cell type specific responses to a treatment is a big
-advantage of single cell data over bulk data.
-
-``` r
-# The contrast argument specifies what we want to compare
-# We test the expression difference of stimulated and control T-cells
-de_res <- test_de(fit, contrast = cond(cell = "CD4 T cells", stim = "ctrl") - cond(cell = "CD4 T cells", stim = "stim")) 
-
-# Most different genes
-head(de_res[order(de_res$pval), ])
-```
-
-The test is successful and we identify interesting genes that are
-differentially expressed in interferon-stimulated T cells: *IFI6*,
-*IFIT3* and *ISG15* literally stand for *Interferon Induced/Stimulated
-Protein*.
-
-To get a more complete overview of the results, we can make a volcano
-plot that compares the log2-fold change (LFC) vs the logarithmized
-p-values.
-
-``` r
-library(ggplot2)
-ggplot(de_res, aes(x = lfc, y = -log10(pval))) +
-  geom_point(size = 0.6, aes(color = adj_pval < 0.1)) +
-  ggtitle("Volcano Plot", "Genes that change most through interferon-beta treatment in T cells")
-```
-
-Another important task in single cell data analysis is the
-identification of marker genes for cell clusters. For this we can also
-use our Gamma-Poisson fit.
-
-Let’s assume we want to find genes that differ between T cells and the B
-cells. We can directly compare the corresponding coefficients and find
-genes that differ in the control condition (this time not accounting for
-the pseudo-replication structure):
-
-``` r
-fit_full <- glm_gp(sce_subset, design = ~ cell + stim +  stim:cell - 1,
-                   reference_level = "NK cells")
-marker_genes <- test_de(fit_full, `cellCD4 T cells` - `cellB cells`, sort_by = pval)
-head(marker_genes)
-```
-
-If we want find genes that differ in the stimulated condition, we just
-include the additional coefficients in the contrast:
-
-``` r
-marker_genes2 <- test_de(fit_full, (`cellCD4 T cells` + `cellCD4 T cells:stimstim`) - 
-                               (`cellB cells` + `cellB cells:stimstim`), 
-                        sort_by = pval)
-
-head(marker_genes2)
-```
-
-We identify many genes related to the human leukocyte antigen (HLA)
-system that is important for antigen presenting cells like B-cells, but
-are not expressed by T helper cells. The plot below shows the expression
-differences.
-
-A note of caution: applying `test_de()` to single cell data without the
-pseudobulk gives overly optimistic p-values. This is due to the fact
-that cells from the same sample are not independent replicates! It can
-still be fine to use the method for identifying marker genes, as long as
-one is aware of the difficulties interpreting the results.
-
-``` r
-# Create a data.frame with the expression values, gene names, and cell types
-tmp <- data.frame(gene = rep(marker_genes$name[1:6], times = ncol(sce_subset)),
-                  expression = c(counts(sce_subset)[marker_genes$name[1:6], ]),
-                  celltype = rep(sce_subset$cell, each = 6))
-
-ggplot(tmp, aes(x = celltype, y = expression)) +
-  geom_jitter(height = 0.1) +
-  stat_summary(geom = "crossbar", fun = "mean", color = "red") +
-  facet_wrap(~ gene, scales = "free_y") +
-  ggtitle("Marker genes of B vs. T cells")
 ```
 
 ## Acknowlegments
 
-Original work for the glmGamPoi package was supported by the EMBL International PhD Programme and the European Research Council Synergy grant DECODE under grant agreement No. 810296.
+Original work for the [original glmGamPoi package](https://github.com/const-ae/glmGamPoi) was supported by the EMBL International PhD Programme and the European Research Council Synergy grant DECODE under grant agreement No. 810296.
 
-Work for the glmGamPoi2 fork was supported by startup funds from the University of Toronto under the supervision of Dr. Aleksandrina Goeva.
+Work for the [glmGamPoi2 fork](https://github.com/goeva-lab/glmGamPoi2) was supported by startup funds from the University of Toronto under the supervision of Dr. Aleksandrina Goeva.

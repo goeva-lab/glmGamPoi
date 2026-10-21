@@ -2,7 +2,7 @@
 #'
 #' @param y a numeric or integer vector or matrix with the counts for which
 #'   the overdispersion is estimated
-#' @param mean a numeric vector of either length 1 or `length(y)` or if
+#' @param mu a numeric vector of either length 1 or `length(y)` or if
 #'  `y` is a matrix, a matrix with the same dimensions. Contains
 #'   the predicted value for that sample. If missing: `mean(y)` / `rowMeans(y)`
 #' @param model_matrix a numeric matrix that specifies the experimental
@@ -17,6 +17,8 @@
 #' @param global_estimate flag to decide if a single overdispersion for a whole matrix is calculated
 #'   instead of one estimate per row. This parameter has no affect if `y` is a vector. Default: `FALSE`
 #' @param max_iter the maximum number of iterations for each gene
+#' @param use_nr_overdisp_impl boolean flag to indicate if the alternate C++-based overdispersion estimation routine should be used
+#' @param do_parallel integer to indicate degree of parallelization to be enabled, 0 indicates no parallelism
 #' @inheritParams glm_gp
 #'
 #' @details

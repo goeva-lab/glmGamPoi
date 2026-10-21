@@ -101,7 +101,7 @@
 #'        the number of threads used is equal to the provided integer
 #'     \item `delay_mu`: Mu matrix is never explicitly formed, instead Mu field of output is provided as a function
 #'        which can be called to materialize full matrix.
-#'        IMPORTANT NOTE: [predict] and [residuals] methods will lead to a memory spike if this option is enabled, as they require the full Mu matrix to be present in memory.
+#'        IMPORTANT NOTE: [predict.glmGamPoi2] and [residuals.glmGamPoi2] methods will lead to a memory spike if this option is enabled, as they require the full Mu matrix to be present in memory.
 #'     \item `use_nr_overdisp_impl`: uses a C++-implemented newton-raphson procedure instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
 #'   }
 #'   Default: `FALSE`, meaning no optimizations are made
@@ -733,7 +733,6 @@ is_on_disk.glmGamPoi2 <- function(fit) {
   is(fit$Mu, "DelayedMatrix") && is(DelayedArray::seed(fit$Mu), "HDF5ArraySeed")
 }
 
-#' @export
 filt <- function(x, i, j, ...) {
   # subset by observations
   if (!missing(j) && !is.null(j)) {

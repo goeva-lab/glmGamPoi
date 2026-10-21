@@ -25,7 +25,7 @@
 #'   Default: `NULL` which means that the data is not subset.
 #' @param pseudobulk_by *DEPRECTATED*, please use the [pseudobulk] function instead. \cr
 #'   A vector with the same length as `ncol(fit$data)` that is used to
-#'   split the columns into different groups (calls [split()]). `pseudobulk_by` can also be an
+#'   split the columns into different groups (calls [base::split]). `pseudobulk_by` can also be an
 #'   expression that evaluates to a vector. The expression can reference columns from `colData(fit$data)`. \cr
 #'   The counts are summed across the groups
 #'   to create "pseudobulk" samples. This is typically used in single cell analysis if the cells come

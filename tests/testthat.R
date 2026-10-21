@@ -1,4 +1,4 @@
 library(testthat)
-library(glmGamPoi)
+library(glmGamPoi2)
 
 test_check("glmGamPoi2")
