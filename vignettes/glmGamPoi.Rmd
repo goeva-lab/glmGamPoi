@@ -48,10 +48,10 @@ For the latest developments, see the `r BiocStyle::Githubpkg("const-ae/glmGamPoi
 
 ## Example
 
-Load the glmGamPoi package
+Load the glmGamPoi2 package
 
 ```{r}
-library(glmGamPoi)
+library(glmGamPoi2)
 ```
 
 

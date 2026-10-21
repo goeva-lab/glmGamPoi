@@ -1,9 +1,17 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^README\.Rmd$
-tmp_scripts
-.github
 
-^air.toml$
-^jarl.toml$
-^.lintr.R$
+^.github$
+
+air.toml
+jarl.toml
+.lintr.R
+.clang-format
+.clang-tidy
+
+^inst/include/LBFGSpp/.bcr$
+^inst/include/LBFGSpp/.git$
+
+^.devcontainer$
+^.vscode$
