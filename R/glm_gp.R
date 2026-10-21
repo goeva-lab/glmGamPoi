@@ -648,7 +648,7 @@ relevel_columns_to_reference_level <- function(col_data, reference_level = NULL)
       },
       FUN.VALUE = FALSE
     )
-    if (all(has_ref_level == FALSE)) {
+    if (!any(has_ref_level)) {
       stop("None of the columns contains the specified reference_level.")
     }
     col_data[has_ref_level] <- lapply(col_data[has_ref_level], function(col) {
@@ -669,7 +669,7 @@ convert_chr_vec_to_model_matrix <- function(design, reference_level) {
     design_fct <- design
   }
 
-  if (length(levels(design_fct)) == 1) {
+  if (nlevels(design_fct) == 1) {
     helper_df <- data.frame(x_ = design_fct)
     tmp <- convert_formula_to_model_matrix(~1, col_data = helper_df)
     mm <- tmp$model_matrix

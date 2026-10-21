@@ -25,7 +25,7 @@ test_that("loc_median_fit works", {
   expect_equal(y == 0, is.na(r6))
 
   r7 <- loc_median_fit(x, y, npoints = 4, ignore_zeros = TRUE)
-  expect_true(!any(is.na(r7)))
+  expect_true(!anyNA(r7))
 })
 
 

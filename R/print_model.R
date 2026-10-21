@@ -222,7 +222,7 @@ format_matrix <- function(matrix, digits = NULL) {
 
 
 my_vec_summary <- function(x, count_na = TRUE) {
-  res <- unname(quantile(x, probs = c(0, 0.25, 0.5, .75, 1), na.rm = TRUE))
+  res <- unname(quantile(x, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE))
   names(res) <- c("Min", "1st Qu.", "Median", "3rd Qu.", "Max")
   if (count_na) {
     res <- c(res, `#NA` = sum(is.na(x)))
@@ -231,7 +231,7 @@ my_vec_summary <- function(x, count_na = TRUE) {
 }
 
 my_matrix_summary <- function(X) {
-  if (any(is.na(X))) {
+  if (anyNA(X)) {
     res <- t(vapply(
       seq_len(ncol(X)),
       function(col_idx) {

@@ -9,6 +9,7 @@ local({
         vapply(
           seq_len(nrow(Y)),
           function(i) {
+            # jarl-ignore missing_argument:>
             mu_i <- if (is.function(mu)) mu(i, ) else mu[i, ]
             conventional_loglikelihood_fast(Y[i, ], ifelse(mu_i > 1e-128, mu_i, 1e-6), log(thetas[[i]]), mm, cr_adj)
           },
@@ -77,7 +78,7 @@ local({
                       mask <- !is.na(liks.ref)
                       liks.ref <- liks.ref[mask]
                       liks.alt <- liks.alt[mask]
-                      expect_all_true(((liks.ref - liks.alt)) <= (1e-4 * abs(liks.ref)))
+                      expect_all_true((liks.ref - liks.alt) <= (1e-4 * abs(liks.ref)))
                     })
                     test_that(sprintf("%s : perf_optim$use_nr_overdisp_impl doesn't significantly change resulting Beta values", templ), {
                       skip_if(cr_adj, "known issue, default overdispersion estimator often ends up falling back to version w/o cox-reid adjustment, which is not true for C++ NR-based estimator")

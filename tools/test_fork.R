@@ -1,4 +1,3 @@
-# jarl-ignore-file internal_function:>
 suppressPackageStartupMessages({
   library(ggplot2)
   library(patchwork)
@@ -218,11 +217,15 @@ sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 /
   Y <- SummarizedExperiment::assay(sce)
   col_data <- SummarizedExperiment::colData(sce)
 
-  off <- glmGamPoi:::combine_size_factors_and_offset(0, "normed_sum", Y)[["offset_matrix"]]
-  mm <- glmGamPoi:::handle_design_parameter(design, Y, col_data, NULL)[["model_matrix"]]
-  betas <- glmGamPoi:::estimate_betas_roughly(Y, mm, off)
-  disps <- glmGamPoi:::estimate_dispersions_roughly(Y, mm, off)
-  ridge <- glmGamPoi:::handle_ridge_penalty_parameter(if (is.function(ridge_vec)) ridge_vec(mm) else ridge_vec, mm)
+  # jarl-ignore internal_function:>
+  {
+    off <- glmGamPoi:::combine_size_factors_and_offset(0, "normed_sum", Y)[["offset_matrix"]]
+    mm <- glmGamPoi:::handle_design_parameter(design, Y, col_data, NULL)[["model_matrix"]]
+    betas <- glmGamPoi:::estimate_betas_roughly(Y, mm, off)
+    disps <- glmGamPoi:::estimate_dispersions_roughly(Y, mm, off)
+    ridge <- glmGamPoi:::handle_ridge_penalty_parameter(if (is.function(ridge_vec)) ridge_vec(mm) else ridge_vec, mm)
+  }
+
   disc.cols <- which(vapply(seq_len(ncol(mm)), function(j) length(unique(mm[, j])) < nrow(mm), logical(1)))
 
   ridge_t <- attr(ridge, "target")
@@ -262,6 +265,7 @@ sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 /
 
   # if we have columns w/ discrete values that can be split into groups
   # also run diff for estimate_betas_group_wise
+  # jarl-ignore internal_function:>
   grps <- glmGamPoi:::get_groups_for_model_matrix(mm[, disc.cols, drop = FALSE])
   if (!is.null(grps)) {
     fns <- append(

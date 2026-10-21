@@ -65,7 +65,7 @@ parse_contrast <- function(contrast, coefficient_names, formula = NULL) {
   if (any(names(level_sets) == "")) {
     stop("All arguments to 'cond()' must be named.")
   }
-  if (any(duplicated(names(level_sets)))) {
+  if (anyDuplicated(names(level_sets)) > 0) {
     stop("All arguments to 'cond()' must be unique.")
   }
 
