@@ -85,7 +85,7 @@ pseudobulk <- function(data, group_by, ..., aggregation_functions = list(counts 
   # Aggregate all assays
   assay_names <- SummarizedExperiment::assayNames(data)
   if (is.null(assay_names)) {
-    assay_names <- seq_len(length(SummarizedExperiment::assays(data)))
+    assay_names <- seq_along(SummarizedExperiment::assays(data))
   }
   new_assays <- lapply(assay_names, function(assay_name) {
     aggr_fnc_res <- get_aggregation_function(assay_name, aggregation_functions)
@@ -116,7 +116,7 @@ pseudobulk <- function(data, group_by, ..., aggregation_functions = list(counts 
   if (is(data, "SingleCellExperiment")) {
     red_assay_names <- SingleCellExperiment::reducedDimNames(data)
     if (is.null(red_assay_names)) {
-      red_assay_names <- seq_len(length(SingleCellExperiment::reducedDims(data)))
+      red_assay_names <- seq_along(SingleCellExperiment::reducedDims(data))
     }
     new_red_dims <- lapply(red_assay_names, function(red_name) {
       aggr_fnc_res <- get_aggregation_function(red_name, aggregation_functions)

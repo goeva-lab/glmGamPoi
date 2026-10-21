@@ -58,9 +58,9 @@ colData(reduced_sce)
 You can simulate the pseudobulk sample generation and check if you are using the correct arguments by calling `dplyr::group_by`. Note that the order of the output differs because `group_by` automatically sorts the keys.
 ```{r}
 library(dplyr, warn.conflicts = FALSE)
-colData(sce) %>%
-  as_tibble() %>%
-  group_by(ind, condition = stim, cell) %>%
+colData(sce) |>
+  as_tibble() |>
+  group_by(ind, condition = stim, cell) |>
   summarize(n_cells = n(), .groups = "drop")
 ```
 

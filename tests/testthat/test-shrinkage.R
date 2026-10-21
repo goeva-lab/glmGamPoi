@@ -52,6 +52,7 @@ test_that("variance prior estimation works", {
   obs_var <- DelayedMatrixStats::rowVars(observations)
   df <- ncol(observations) - 1
 
+  # jarl-ignore undesirable_operator:>
   res_limma <- limma:::squeezeVar(obs_var, df = df)
   res_gp <- variance_prior(obs_var, df)
 

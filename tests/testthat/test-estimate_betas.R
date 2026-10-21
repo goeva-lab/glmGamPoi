@@ -618,6 +618,7 @@ test_that("Beta estimation can handle any kind of model_matrix", {
 
   fit <- estimate_betas_fisher_scoring(Y, model_matrix = model_matrix, offset_matrix = offset_matrix, dispersions = disp_init, beta_mat_init = beta_init, ridge_penalty = NULL)
 
+  # jarl-ignore undesirable_operator:>
   deseq2_fit <- DESeq2:::fitBetaWrapper(
     ySEXP = Y,
     xSEXP = model_matrix,

@@ -22,17 +22,19 @@ sourceH <- function(pth, monomorph = list(), export.all = TRUE, ...) {
       stringr::str_subset(
         purrr::map(lines, function(l) {
           if (stringr::str_detect(l, stringr::fixed("// [[Rcpp::export]]"))) {
+            # jarl-ignore undesirable_operator:>
             is_export <<- TRUE
             return(l)
           }
           if (is_export && stringr::str_detect(l, templ_pat)) {
+            # jarl-ignore undesirable_operator:>
             swp <<- TRUE
             return(stringr::str_replace(l, templ_pat, "\\1\\3"))
           }
           if (swp) {
             return(stringr::str_replace_all(l, stringr::fixed(trg), dst))
           }
-
+          # jarl-ignore undesirable_operator:>
           if (swp && (l == "}")) {
             is_export <<- export.all
             swp <<- FALSE
@@ -217,7 +219,7 @@ sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 /
   Y <- SummarizedExperiment::assay(sce)
   col_data <- SummarizedExperiment::colData(sce)
 
-  # jarl-ignore internal_function:>
+  # jarl-ignore undesirable_operator:>
   {
     off <- glmGamPoi:::combine_size_factors_and_offset(0, "normed_sum", Y)[["offset_matrix"]]
     mm <- glmGamPoi:::handle_design_parameter(design, Y, col_data, NULL)[["model_matrix"]]
@@ -265,7 +267,8 @@ sce.diff <- function(sce, design, tol = 1e-8, ridge_vec = function(mm) c(5e-11 /
 
   # if we have columns w/ discrete values that can be split into groups
   # also run diff for estimate_betas_group_wise
-  # jarl-ignore internal_function:>
+
+  # jarl-ignore undesirable_operator: <reason>
   grps <- glmGamPoi:::get_groups_for_model_matrix(mm[, disc.cols, drop = FALSE])
   if (!is.null(grps)) {
     fns <- append(
