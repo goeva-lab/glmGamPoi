@@ -211,8 +211,8 @@ List fitBeta_diagonal_fisher_scoring(const RObject Y, const Eigen::Map<Eigen::Ma
                                      const double max_rel_mu_change, const int max_iter, const bool try_recov_w_optim = false,
                                      const int do_parallel = 0) {
   const auto conf = FisherScoreDiagApprox();
-  return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, tolerance, max_rel_mu_change,
-                                     max_iter, try_recov_w_optim, do_parallel);
+  return fitBeta_fisher_scoring_impl(Y, model_matrix, exp_offset_matrix, thetas, beta_mat_v, conf, tolerance, max_rel_mu_change, max_iter,
+                                     try_recov_w_optim, do_parallel);
 }
 
 template <class FSConf>

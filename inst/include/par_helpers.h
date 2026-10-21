@@ -1,12 +1,12 @@
 #ifndef PAR_HELPERS_H
 #define PAR_HELPERS_H
 
-#include <utility> // for std::as_const
 #include <csignal>
+#include <utility> // for std::as_const
 
-#include <Eigen/Core>
-#include "tatami/utils/parallelize.hpp"
 #include "tatami/base/Matrix.hpp"
+#include "tatami/utils/parallelize.hpp"
+#include <Eigen/Core>
 
 namespace {
 volatile std::sig_atomic_t GOT_SIGTERM = 0;

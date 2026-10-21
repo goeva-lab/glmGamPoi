@@ -5,10 +5,10 @@
 using namespace Rcpp;
 
 // [[Rcpp::export(name = "compute_gp_deviance")]]
-double compute_gp_deviance_mask(const double y, const double mu,const double theta) { return compute_gp_deviance(y, mu, theta); }
+double compute_gp_deviance_mask(const double y, const double mu, const double theta) { return compute_gp_deviance(y, mu, theta); }
 
 // [[Rcpp::export(name = "compute_gp_deviance_sum")]]
-double compute_gp_deviance_sum_mask(const NumericVector y,const NumericVector mu,const double theta) {
+double compute_gp_deviance_sum_mask(const NumericVector y, const NumericVector mu, const double theta) {
   double dev = 0.0;
   const size_t n_elem = y.size();
   for (size_t i = 0; i < n_elem; i++) {
