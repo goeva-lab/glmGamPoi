@@ -16,25 +16,6 @@ Description: Fit linear models to overdispersed count data.
 License: GPL-3
 Encoding: UTF-8
 SystemRequirements: C++17
-Suggests: 
-    testthat (>= 2.1.0),
-    zoo,
-    DESeq2,
-    edgeR,
-    limma,
-    MASS,
-    statmod,
-    ggplot2,
-    bench,
-    BiocParallel,
-    knitr,
-    rmarkdown,
-    BiocStyle,
-    TENxPBMCData,
-    muscData,
-    scran,
-    dplyr,
-    waldo
 LinkingTo: 
     Rcpp,
     RcppEigen,
@@ -58,7 +39,26 @@ Imports:
     utils,
     splines,
     rlang,
-    vctrs
+    vctrs,
+Suggests: 
+    testthat (>= 2.1.0),
+    zoo,
+    DESeq2,
+    edgeR,
+    limma,
+    MASS,
+    statmod,
+    ggplot2,
+    bench,
+    BiocParallel,
+    knitr,
+    rmarkdown,
+    BiocStyle,
+    TENxPBMCData,
+    muscData,
+    scran,
+    dplyr,
+    waldo,
 Roxygen: list(markdown = TRUE)
 URL: https://github.com/goeva-lab/glmGamPoi
 BugReports: https://github.com/goeva-lab/glmGamPoi/issues
