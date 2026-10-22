@@ -15,3 +15,5 @@ jarl.toml
 
 ^.devcontainer$
 ^.vscode$
+
+^_pkgdown\.yml$

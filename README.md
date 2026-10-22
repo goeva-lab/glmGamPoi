@@ -1,7 +1,7 @@
-# glmGamPoi <img src="./vignettes/img/logo.svg" alt="logo" height="128" align="right"/>
+# glmGamPoi\[2\] <img src="logo.svg" alt="logo" height="128" align="right"/>
 
 > Fit Gamma-Poisson Generalized Linear Models Reliably.
-\
+
 > [!IMPORTANT]
 > this repo is a fork of upstream [glmGamPoi](https://github.com/const-ae/glmGamPoi).
 > it is specifically designed to optimize memory use and runtime, without sacrificing the library's existing accuracy or features.

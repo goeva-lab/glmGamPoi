@@ -9,8 +9,7 @@
 #include <utility> // for std::as_const
 
 #include <Eigen/Dense>
-template <class D> using EMB 
-= Eigen::MatrixBase<D>;
+template <class D> using EMB = Eigen::MatrixBase<D>;
 using Eigen::ArrayXd;
 using Eigen::VectorXd;
 
