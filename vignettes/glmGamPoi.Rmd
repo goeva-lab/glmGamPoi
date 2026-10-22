@@ -11,12 +11,12 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
+  eval = Sys.getenv("CI") == "",
   collapse = TRUE,
   comment = "#>"
 )
 set.seed(2)
 ```
-
 
 > Fit Gamma-Poisson Generalized Linear Models Reliably.
 
@@ -31,21 +31,6 @@ The core design aims of `gmlGamPoi` are:
 * Avoid unnecessary dependencies
 * Make integration into other tools easy
 
-
-## Installation
-
-You can install the release version of `r BiocStyle::Biocpkg("glmGamPoi")` from BioConductor:
-
-``` r
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
-
-BiocManager::install("glmGamPoi")
-```
-
-For the latest developments, see the `r BiocStyle::Githubpkg("const-ae/glmGamPoi", "GitHub")` repo.
-
-
 ## Example
 
 Load the glmGamPoi2 package
@@ -53,7 +38,6 @@ Load the glmGamPoi2 package
 ```{r}
 library(glmGamPoi2)
 ```
-
 
 To fit a single Gamma-Poisson GLM do:
 
@@ -74,6 +58,7 @@ The `glm_gp()` function returns a list with the results of the fit. Most importa
 Fitting repeated Gamma-Poisson GLMs for each gene of a single cell dataset is just as easy:
 
 I will first load an example dataset using the `TENxPBMCData` package. The dataset has 33,000 genes and 4340 cells. It takes roughly 1.5 minutes to fit the Gamma-Poisson model on the full dataset. For demonstration purposes, I will subset the dataset to 300 genes, but keep the 4340 cells:
+
 ```{r, warning=FALSE, message = FALSE}
 library(SummarizedExperiment)
 library(DelayedMatrixStats)
@@ -97,13 +82,9 @@ fit <- glm_gp(pbmcs_subset, on_disk = FALSE)
 summary(fit)
 ```
 
-
-
 ## Benchmark
 
 I compare my method (in-memory and on-disk) with `r BiocStyle::Biocpkg("DESeq2")` and `r BiocStyle::Biocpkg("edgeR")`. Both are classical methods for analyzing RNA-Seq datasets and have been around for almost 10 years. Note that both tools can do a lot more than just fitting the Gamma-Poisson model, so this benchmark only serves to give a general impression of the performance.
-
-
 
 ```{r, warning=FALSE}
 # Explicitly realize count matrix in memory so that it is a fair comparison
@@ -156,7 +137,6 @@ edgeR_data <- edgeR::estimateDisp(edgeR_data, model_matrix)
 edgeR_fit <- edgeR::glmFit(edgeR_data, design = model_matrix)
 ```
 
-
 ```{r coefficientComparison, fig.height=5, fig.width=10, warning=FALSE, echo = FALSE}
 par(mfrow = c(2, 4), cex.main = 2, cex.lab = 1.5)
 plot(fit$Beta[, 1], coef(dds)[, 1] / log2(exp(1)),
@@ -193,13 +173,11 @@ plot(fit$overdispersions, edgeR_fit$dispersion,
 abline(0, 1)
 ```
 
-I am comparing the gene-wise estimates of the coefficients from all three methods. Points on the diagonal line are identical. The inferred Beta coefficients and gene means agree well between the methods, however the overdispersion differs quite a bit. `DESeq2` has problems estimating most of the overdispersions and sets them to `1e-8`. `edgeR` only approximates the overdispersions which explains the variation around the overdispersions calculated with `glmGamPoi`. 
-
+I am comparing the gene-wise estimates of the coefficients from all three methods. Points on the diagonal line are identical. The inferred Beta coefficients and gene means agree well between the methods, however the overdispersion differs quite a bit. `DESeq2` has problems estimating most of the overdispersions and sets them to `1e-8`. `edgeR` only approximates the overdispersions which explains the variation around the overdispersions calculated with `glmGamPoi`.
 
 ## Scalability
 
 The method scales linearly, with the number of rows and columns in the dataset. For example: fitting the full `pbmc4k` dataset with subsampling on a modern MacBook Pro in-memory takes ~1 minute and on-disk a little over 4 minutes. Fitting the `pbmc68k` (17x the size) takes ~73 minutes (17x the time) on-disk.
-
 
 ## Differential expression analysis
 
@@ -238,13 +216,11 @@ fit <- glm_gp(sce_subset,
 summary(fit)
 ```
 
-
 To see how the coefficient of our model are called, we look at the `colnames(fit$Beta)`:
 
 ```{r}
 colnames(fit$Beta)
 ```
-
 
 In our example, we want to find the genes that change specifically in T cells. Finding cell type specific responses to a treatment is a big advantage of single cell data over bulk data. To get a proper estimate of the uncertainty (cells from the same donor are **not** independent replicates), we create a pseudobulk for each sample:
 
@@ -278,8 +254,7 @@ ggplot(de_res, aes(x = lfc, y = -log10(pval))) +
   ggtitle("Volcano Plot", "Genes that change most through interferon-beta treatment in T cells")
 ```
 
-
-Another important task in single cell data analysis is the identification of marker genes for cell clusters. For this we can also use our Gamma-Poisson fit. 
+Another important task in single cell data analysis is the identification of marker genes for cell clusters. For this we can also use our Gamma-Poisson fit.
 
 Let's assume we want to find genes that differ between T cells and the B cells. We can directly compare the corresponding coefficients and find genes that differ in the control condition:
 
@@ -315,7 +290,7 @@ ggplot(tmp, aes(x = celltype, y = expression)) +
   ggtitle("Marker genes of B vs. T cells")
 ```
 
-# Session Info
+## Session Info
 
 ```{r}
 sessionInfo()
