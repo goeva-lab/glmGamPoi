@@ -79,20 +79,24 @@ jobs:
 
       - run: |
           pak::pak(c("Rcpp", "roxygen2"))
+
           Rcpp::compileAttributes()
+          pak::local_install_dev_deps()
           roxygen2::roxygenize()
         shell: 'Rscript {0}'
       - run: |
           pak::pak(c("lintr"))
+
           base::quit(save = "no", status = length(print(lintr::lint_package())) != 0)
         shell: 'Rscript {0}'
       - run: |
           pak::pak(c("testthat"))
-          pak::local_install_dev_deps()
+
           testthat::test_local(reporter = testthat::LocationReporter)
         shell: 'Rscript {0}'
       - run: |
           pak::pak(c("devtools"))
+
           devtools::check(error_on = "error", args = c("--no-tests", "--timings"), vignettes = FALSE)
         shell: 'Rscript {0}'
       - run: |
