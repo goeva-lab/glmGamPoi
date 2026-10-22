@@ -9,3 +9,6 @@ linters <- linters_with_defaults(
   paren_body_linter = NULL,
   commented_code_linter = NULL
 )
+exclusions <- list(
+  "R/RcppExports.R"
+)
