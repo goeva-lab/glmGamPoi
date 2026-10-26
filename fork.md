@@ -9,19 +9,6 @@ an explicit aim of this project has been to allow for upstream-ing of the releva
 > the package & main exported class have been renamed to `glmGamPoi2`.
 > this change is intended to be temporary and to be reverted should we merge into upstream.
 
-## installing the fork
-
-this fork can be installed as follows (using [`pak`](https://pak.r-lib.org)):
-
-```R
-withr::with_options(
-  list(pkg.git_submodules = TRUE), 
-  pak::pak("git::https://github.com/goeva-lab/glmGamPoi.git@perf_optim_eigen")
-)
-```
-
-the `pkg.git_submodules` setting override is necessary since this fork vendors [`LBFGSpp`](https://github.com/yixuan/LBFGSpp/) as a git submodule, which aren't loaded by `pak` by default.
-
 ## user-facing changes
 
 the main user-facing consequence of these changes is the addition of the `perf_optim` list parameter to `glm_gp`, which controls various steps taken for optimization.
