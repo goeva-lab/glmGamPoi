@@ -9,7 +9,7 @@
 
 Pronounciation: [`dʒi əl əm ɡam ˈpwɑ`](http://ipa-reader.com/?text=d%CA%92i%20%C9%99l%20%C9%99m%20%C9%A1am%20%CB%88pw%C9%91)
 
-The core design aims of `glmGamPoi` are:
+The core design aims of `glmGamPoi[2]` are:
 
 - Fit Gamma-Poisson models on arbitrarily large or small datasets
 - Be faster and more memory efficient than alternative methods, such as `DESeq2` or `edgeR`
@@ -24,7 +24,15 @@ The core design aims of `glmGamPoi` are:
 
 You can build and install [`glmGamPoi2`](https://github.com/goeva-lab/glmGamPoi) from the automatically automatically built package archive published from the latest [GitHub release](https://github.com/goeva-lab/glmGamPoi/releases/latest/download/glmGamPoi.tar.gz).
 
-This can be done using the [`withr`](https://withr.r-lib.org/) (to guarantee a maximally optimized build) and [`pak`](https://pak.r-lib.org/) (for installation) R packages via the following snippet:
+This can be done using the [`pak`](https://pak.r-lib.org/) (for installation) R package via the following snippet:
+
+```R
+pak::pak("url::https://github.com/goeva-lab/glmGamPoi/releases/latest/download/glmGamPoi2.tar.gz")
+```
+
+<details><summary>Details regarding optimized build instructions</summary>
+
+To build and install the package with the maximal level of optimizations enabled for your particular machine, the  [`withr`](https://withr.r-lib.org/) package can be used as follows:
 
 ```R
 shared_flags <- "-fuse-ld=lld -flto -ffat-lto-objects -fopenmp"
@@ -37,7 +45,9 @@ withr::with_makevars(assignment = "=", c(
 })
 ```
 
-If you use this package in a scientific publication, please make sure to cite the original [glmGamPoi publication](https://doi.org/10.1093/bioinformatics/btaa1009):
+</details>
+
+If you use this package in a scientific publication, please make sure to cite the [original glmGamPoi publication](https://doi.org/10.1093/bioinformatics/btaa1009):
 
 > glmGamPoi: Fitting Gamma-Poisson Generalized Linear Models on Single
 > Cell Count Data  
