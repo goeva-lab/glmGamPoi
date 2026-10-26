@@ -77,9 +77,28 @@
 #' @seealso [glm_gp()]
 #' @export
 #' @importFrom beachmat initializeCpp
-overdispersion_mle <- function(y, mu, model_matrix = NULL, do_cox_reid_adjustment = !is.null(model_matrix), global_estimate = FALSE, subsample = FALSE, max_iter = 200, verbose = FALSE, use_nr_overdisp_impl = FALSE, do_parallel = 0) {
+overdispersion_mle <- function(
+  y,
+  mu,
+  model_matrix = NULL,
+  do_cox_reid_adjustment = !is.null(model_matrix),
+  global_estimate = FALSE,
+  subsample = FALSE,
+  max_iter = 200,
+  verbose = FALSE,
+  use_nr_overdisp_impl,
+  do_parallel
+) {
   # Validate n_subsampling
   stopifnot(length(subsample) == 1, subsample >= 0)
+
+  if (missing(use_nr_overdisp_impl)) {
+    use_nr_overdisp_impl <- .perf_optim.use_nr_overdisp_impl
+  }
+  if (missing(do_parallel)) {
+    do_parallel <- .perf_optim.do_parallel
+  }
+
   if (isFALSE(subsample)) {
     n_subsamples <- length(y)
   } else if (isTRUE(subsample)) {
@@ -130,7 +149,7 @@ overdispersion_mle <- function(y, mu, model_matrix = NULL, do_cox_reid_adjustmen
 }
 
 
-overdispersion_mle_impl <- function(y, mu, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, verbose = FALSE, use_nr_overdisp_impl = FALSE) {
+overdispersion_mle_impl <- function(y, mu, model_matrix, do_cox_reid_adjustment, n_subsamples, max_iter, verbose = FALSE, use_nr_overdisp_impl) {
   stopifnot(is.numeric(y))
   if (missing(mu)) {
     mu <- base::mean(y)
@@ -160,11 +179,19 @@ overdispersion_mle_impl <- function(y, mu, model_matrix, do_cox_reid_adjustment,
   stopifnot(all(is.finite(y)))
   stopifnot(all(is.finite(mu)))
 
+  if (missing(use_nr_overdisp_impl)) {
+    use_nr_overdisp_impl <- .perf_optim.use_nr_overdisp_impl
+  }
+
   conventional_overdispersion_mle(y, mu_vector = mu, model_matrix = model_matrix, do_cox_reid_adjustment = do_cox_reid_adjustment, max_iter = max_iter, use_nr_overdisp_impl = use_nr_overdisp_impl)
 }
 
 
-conventional_overdispersion_mle <- function(y, mu_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 200, use_nr_overdisp_impl = FALSE) {
+conventional_overdispersion_mle <- function(y, mu_vector, model_matrix = matrix(1, nrow = length(y), ncol = 1), do_cox_reid_adjustment = TRUE, max_iter = 200, use_nr_overdisp_impl) {
+  if (missing(use_nr_overdisp_impl)) {
+    use_nr_overdisp_impl <- .perf_optim.use_nr_overdisp_impl
+  }
+
   if (use_nr_overdisp_impl) {
     return(NR_overdispersion_mle(y, mu_vector, model_matrix, do_cox_reid_adjustment, max_iter))
   }
@@ -257,7 +284,11 @@ conventional_overdispersion_mle <- function(y, mu_vector, model_matrix = matrix(
 
 
 #' @importFrom beachmat initializeCpp
-estimate_global_overdispersion <- function(Y, Mu, model_matrix, do_cox_reid_adjustment, do_parallel = 0) {
+estimate_global_overdispersion <- function(Y, Mu, model_matrix, do_cox_reid_adjustment, do_parallel) {
+  if (missing(do_parallel)) {
+    do_parallel <- .perf_optim.do_parallel
+  }
+
   # The idea to calculate the log-likelihood and than maximize the interpolation
   # is from edgeR.
   # The runtime is linear with the number of `log_thetas`

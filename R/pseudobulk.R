@@ -1,34 +1,37 @@
-#' Create a 'SingleCellExperiment' containing pseudo-bulk samples
+#' Create a [`SingleCellExperiment`] containing pseudo-bulk samples
 #'
-#' @param data a 'SingleCellExperiment' or an object of a related class
+#' @param data a [`SingleCellExperiment`] or an object of a related class
 #' @param group_by an unquoted expression that can refer to columns in
-#'   the 'colData()'. All observations with the same factor level are aggregated.
+#'   the `colData()`. All observations with the same factor level are aggregated.
 #'   The argument follows the same logic as `dplyr::group_by()`. The argument must
 #'   wrapped using `vars()`.
-#' @param ... named expressions that summarize columns in 'colData()'. Each expression
+#' @param ... named expressions that summarize columns in `colData()`. Each expression
 #'   must produce a value of length 1. The arguments follow the same logic
 #'   as `dplyr::summarize()`.
 #' @param aggregation_functions a named list with functions that are used to
 #'   aggregate the assays in the `data`.
 #' @param col_data additional data with `ncol(data)` rows. The `group_by` and named
 #'   arguments can refer to the columns of the `col_data` in addition to the columns in
-#'   `colData(data)` (assuming `data` is a `SummarizedExperiment`).
+#'   `colData(data)` (assuming `data` is a [`SummarizedExperiment`]).
 #' @param make_colnames a boolean that decides if the column names are the concatenated
 #'   values of `group_by`. Default: `TRUE`
 #' @param verbose a boolean that indicates if information about the process are printed Default: `TRUE`.
 #'
 #'
-#' @return a SingleCellExperiment object
+#' @return a [`SingleCellExperiment`] object
 #'
 #' @examples
-#'  library(SingleCellExperiment)
+#'  suppressPackageStartupMessages(library(SingleCellExperiment))
+#'
 #'  data <- data.frame(sample = sample(c("samp1", "samp2", "samp3"), size = 50, replace = TRUE),
 #'        celltype = sample(c("T cells", "B cells", "Macrophages"), size = 50, replace = TRUE),
 #'        size = rnorm(n = 50, mean = 40, sd = 15))
 #'  Y <- matrix(rnbinom(n = 100 * 50, mu = 3, size = 1/3.1), nrow = 100, ncol = 50)
 #'  sce <- SingleCellExperiment(Y, colData = data)
 #'  aggr_sce <- pseudobulk(sce, group_by = vars(sample, celltype), size = mean(size))
+#'
 #'  aggr_sce
+#'
 #'  colData(aggr_sce)
 #'
 #' @export
@@ -234,7 +237,7 @@ get_aggregation_function <- function(assay_name, aggregation_functions) {
 #'
 #' @param ... the quoted expression
 #'
-#' @seealso ggplot2::vars, dplyr::vars
+#' @seealso `ggplot2::vars`, `dplyr::vars`
 #'
 #' @export
 vars <- function(...) {

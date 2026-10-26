@@ -64,7 +64,11 @@ estimate_size_factors <- function(Y, method, verbose = FALSE) {
 }
 
 
-combine_size_factors_and_offset <- function(offset, size_factors, Y, verbose = FALSE, offset_as_vec = FALSE) {
+combine_size_factors_and_offset <- function(offset, size_factors, Y, verbose = FALSE, offset_as_vec) {
+  if (missing(offset_as_vec)) {
+    offset_as_vec <- .perf_optim.offset_as_vec
+  }
+
   n_genes <- nrow(Y)
   n_samples <- ncol(Y)
 

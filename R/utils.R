@@ -136,7 +136,7 @@ divide_each_row_by_vector <- function(matrix, vector) {
 }
 
 
-#' Solve the equation Y = A B for A or B
+#' Solve the equation `Y = A B` for `A` or `B`
 #'
 #' @param Y the left side of the equation
 #' @param A,B the known matrix on the right side of the equation
@@ -234,65 +234,6 @@ div_mtx_colwise <- function(lhs, rhs) {
   t(t(lhs) / rhs)
 }
 
-handle_perf_optim_parameter <- function(param) {
-  default_opts <- list(
-    "offset_as_vec" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
-    "cast_dgC_Y_to_dgR" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
-    "do_parallel" = list(0L, function(e) (is.integer(e) && (length(e) == 1)), "integer of length 1"),
-    "delay_mu" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1"),
-    "use_nr_overdisp_impl" = list(FALSE, function(e) (is.logical(e) && (length(e) == 1)), "logical of length 1")
-  )
-
-  out <- if (is.logical(param) && (length(param) == 1)) {
-    list(
-      "offset_as_vec" = param,
-      "cast_dgC_Y_to_dgR" = param,
-      "do_parallel" = if (param) parallel::detectCores() else 0L,
-      "delay_mu" = param,
-      "use_nr_overdisp_impl" = param
-    )
-  } else if (is.list(param) && (length(union(names(default_opts), names(param)))) == length(default_opts)) {
-    for (nm in names(param)) {
-      if (!default_opts[[nm]][[2]](param[[nm]])) {
-        stop(sprintf(
-          "got perf_optim parameter (`%s`, at index - `%s`) of wrong type/shape, must be %s",
-          param[[nm]],
-          nm,
-          default_opts[[nm]][[3]]
-        ))
-      }
-    }
-    utils::modifyList(lapply(default_opts, function(e) e[[1]]), param)
-  } else {
-    stop(sprintf(
-      "got perf_optim parameter (`%s`) of wrong type/shape, must be list with names `%s` (or a subset thereof) or logical of length 1",
-      paste0(sprintf("%s=%s", names(param), param), collapse = ", "),
-      paste0(names(default_opts), collapse = ", ")
-    ))
-  }
-
-  if (out[["do_parallel"]] == 1L) {
-    warning(paste0(
-      c(
-        "got perf_optim$do_parallel=1, meaning no parallelization is enabled while still incurring cost of setting up parallelization-safe machinery.",
-        "this is only useful for internal testing, if you wish to just disable parallelization, you should instead set perf_optim$do_parallel=0."
-      ),
-      collapse = "\n"
-    ))
-  }
-  n_cores <- parallel::detectCores()
-  if (out[["do_parallel"]] > n_cores) {
-    warning(paste0(
-      c(
-        sprintf("got perf_optim$do_parallel=%s, which is greater than the number of cores detected by `parallel::detectCores() (%s)`.", out[["do_parallel"]], n_cores),
-        "unless parallel::detectCores is returning an incorrect value, there is generally no reason to do this as spawning more threads than physical cores will usually harm performance."
-      ),
-      collapse = "\n"
-    ))
-  }
-
-  out
-}
 
 handle_Mu_rowmeans <- local({
   vec_off_fn <- compiler::cmpfun(function(gene_idx, beta_t, mm, offs) mean(calculate_mu(matrix(beta_t[, gene_idx], nrow = 1), mm, offs)), options = list(optimize = 3L))
