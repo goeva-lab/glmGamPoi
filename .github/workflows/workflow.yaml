@@ -22,7 +22,7 @@ jobs:
             'r' 'blas-openblas' \
             'base-devel' 'gcc-fortran' 'clang' 'git' \
             'libuv' 'libxml2' 'curl' \
-            'fontconfig' 'fribidi' 'harfbuzz' 'freetype2' \
+            'fontconfig' 'fribidi' 'harfbuzz' 'freetype2' 'gsfonts' \
             'libjpeg-turbo' 'libpng' 'libtiff' 'libwebp' \
             'texinfo' 'texlive-fontsrecommended' 'texlive-latex' 'texlive-latexrecommended' 'pandoc'
 
@@ -107,6 +107,7 @@ jobs:
           devtools::build_manual(path = ".")
           base::file.rename(list.files(pattern = "^glmGamPoi2_.+\\.pdf$"), "./glmGamPoi2.pdf")
 
+          pkgdown::build_favicons()
           pkgdown::build_site(
             examples = TRUE,
             devel = FALSE, new_process = TRUE, install = TRUE, preview = FALSE,

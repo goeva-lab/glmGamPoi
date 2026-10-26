@@ -17,3 +17,4 @@ jarl.toml
 ^.vscode$
 
 ^_pkgdown\.yml$
+^pkgdown$

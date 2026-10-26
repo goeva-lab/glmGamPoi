@@ -10,3 +10,5 @@ man/
 NAMESPACE
 
 R/RcppExports.R
+
+pkgdown/favicon
