@@ -89,22 +89,12 @@
 #'   data structure.
 #' @param perf_optim a value that indicates if attempts should be made to optimize performance / memory use while fitting the GLM.
 #'   Can be provided as a boolean (turns on/off all optimizations) or as a list to select only specific optimizations.
+#'   For more details on specific optimization flag names and parameters, see [set_perf_optim_opts].
+#'
 #'   Note: various optimizations here can lead to BREAKING changes in output shape and/or values,
 #'   and were designed/intended for application on single-cell transcriptomics data (e.g. sparse matrix, with l.t. ~10% density)
-#'   A list of currently specified optimizations is provided below:
-#'   \itemize{
-#'     \item `offset_as_vec`: if `offset` is provided as either a constant or a vector of per-sample offsets,
-#'       `Offset` will be a vector instead of a matrix to avoid generating a dense n_sample * n_genes matrix
-#'     \item `cast_dgC_Y_to_dgR`: data matrix will be internally converted to row-major format to improve memory access patterns
-#'        as internal steps fetch data row-wise on a per-gene basis
-#'     \item `do_parallel`: if value greater than zero, then enables parallelization for model parameter fitting processes
-#'        the number of threads used is equal to the provided integer
-#'     \item `delay_mu`: Mu matrix is never explicitly formed, instead Mu field of output is provided as a function
-#'        which can be called to materialize full matrix.
-#'        IMPORTANT NOTE: [predict.glmGamPoi2] and [residuals.glmGamPoi2] methods will lead to a memory spike if this option is enabled, as they require the full Mu matrix to be present in memory.
-#'     \item `use_nr_overdisp_impl`: uses a C++-implemented newton-raphson procedure instead of nlmimb for estimating overdispersions, which allows for parallelizing that step
-#'   }
-#'   Default: `FALSE`, meaning no optimizations are made
+#'
+#'   Default: `FALSE`, meaning no optimizations are applied.
 #' @param verbose a boolean that indicates if information about the individual steps are printed
 #'   while fitting the GLM. Default: `FALSE`.
 #'
@@ -245,7 +235,7 @@ glm_gp <- function(
   subsample = FALSE,
   on_disk = NULL,
   use_assay = NULL,
-  perf_optim = FALSE,
+  perf_optim,
   verbose = FALSE
 ) {
   # Validate `data`
@@ -266,6 +256,9 @@ glm_gp <- function(
   col_data <- get_col_data(data, col_data)
   des <- handle_design_parameter(design, data, col_data, reference_level)
 
+  if (missing(perf_optim)) {
+    perf_optim <- get_perf_optim_opts()
+  }
   perf_optim <- handle_perf_optim_parameter(perf_optim)
 
   # Call glm_gp_impl()

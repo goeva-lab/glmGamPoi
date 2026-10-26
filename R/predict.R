@@ -353,7 +353,11 @@ make_model_matrix_for_predict <- function(object, newdata) {
 }
 
 
-handle_offset_param_for_predict <- function(offset, nrow, ncol, on_disk, offset_as_vec = FALSE) {
+handle_offset_param_for_predict <- function(offset, nrow, ncol, on_disk, offset_as_vec) {
+  if (missing(offset_as_vec)) {
+    offset_as_vec <- .perf_optim.offset_as_vec
+  }
+
   if (is.numeric(offset)) {
     stopifnot(length(offset) == 1 || length(offset) == ncol)
     if (offset_as_vec) {

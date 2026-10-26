@@ -56,7 +56,11 @@ estimate_betas_roughly <- function(Y, model_matrix, offset_matrix, pseudo_count 
 #'
 #' @keywords internal
 #' @importFrom beachmat initializeCpp
-estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix, dispersions, beta_mat_init, ridge_penalty, try_recovering_convergence_problems = TRUE, max_iter = 1000, do_parallel = 0) {
+estimate_betas_fisher_scoring <- function(Y, model_matrix, offset_matrix, dispersions, beta_mat_init, ridge_penalty, try_recovering_convergence_problems = TRUE, max_iter = 1000, do_parallel) {
+  if (missing(do_parallel)) {
+    do_parallel <- .perf_optim.do_parallel
+  }
+
   stopifnot(nrow(model_matrix) == ncol(Y))
   stopifnot(nrow(beta_mat_init) == nrow(Y))
   stopifnot(ncol(beta_mat_init) == ncol(model_matrix))
@@ -121,7 +125,7 @@ warn_non_convergence <- function(not_converged, rownames) {
   }
 }
 
-estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, beta_mat_init, ridge_penalty, max_iter = 1000, do_parallel = 0) {
+estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, beta_mat_init, ridge_penalty, max_iter = 1000, do_parallel) {
   stopifnot(nrow(model_matrix) == ncol(Y))
   stopifnot(nrow(beta_mat_init) == nrow(Y))
   stopifnot(ncol(beta_mat_init) == ncol(model_matrix))
@@ -141,6 +145,9 @@ estimate_betas_optim <- function(Y, model_matrix, offset_matrix, dispersions, be
     ridge_target <- attr(ridge_penalty, "target")
     ridge_penalty <- diag(ridge_penalty, nrow = length(ridge_penalty))
     attr(ridge_penalty, "target") <- ridge_target
+  }
+  if (missing(do_parallel)) {
+    do_parallel <- .perf_optim.do_parallel
   }
 
   fitBeta_optim(initializeCpp(Y), model_matrix, initializeCpp(exp(offset_matrix)), dispersions, beta_mat_init, ridge_penalty, max_iter, do_parallel = do_parallel)
@@ -176,7 +183,7 @@ estimate_betas_roughly_group_wise <- function(Y, offset_matrix, groups) {
 #'
 #' @keywords internal
 #' @importFrom beachmat initializeCpp
-estimate_betas_group_wise <- function(Y, offset_matrix, dispersions, beta_group_init = NULL, beta_mat_init = NULL, groups, model_matrix, max_iter = 100, do_parallel = 0) {
+estimate_betas_group_wise <- function(Y, offset_matrix, dispersions, beta_group_init = NULL, beta_mat_init = NULL, groups, model_matrix, max_iter = 100, do_parallel) {
   stopifnot(nrow(beta_group_init) == nrow(Y))
   stopifnot(ncol(beta_group_init) == length(unique(groups)))
   stopifnot(length(dispersions) == nrow(Y))
@@ -190,6 +197,9 @@ estimate_betas_group_wise <- function(Y, offset_matrix, dispersions, beta_group_
     # Calculate group_init based on Beta
     first_occurence_in_groups <- match(unique(groups), groups)
     beta_group_init <- Matrix::tcrossprod(beta_mat_init, model_matrix[first_occurence_in_groups, , drop = FALSE])
+  }
+  if (missing(do_parallel)) {
+    do_parallel <- .perf_optim.do_parallel
   }
 
   Beta_res_list <- lapply(unique(groups), function(gr) {

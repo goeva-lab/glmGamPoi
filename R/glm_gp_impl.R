@@ -26,7 +26,7 @@ glm_gp_impl <- function(
   ridge_penalty = 0,
   do_cox_reid_adjustment = TRUE,
   subsample = FALSE,
-  perf_optim = handle_perf_optim_parameter(FALSE),
+  perf_optim,
   verbose = FALSE
 ) {
   if (is.vector(Y)) {
@@ -38,6 +38,11 @@ glm_gp_impl <- function(
   validate_Y_matrix(Y)
   subsample <- handle_subsample_parameter(Y, subsample)
   ridge_penalty <- handle_ridge_penalty_parameter(ridge_penalty, model_matrix, verbose = verbose)
+
+  if (missing(perf_optim)) {
+    perf_optim <- get_perf_optim_opts()
+  }
+  perf_optim <- handle_perf_optim_parameter(perf_optim)
 
   # Combine offset and size factor
   off_and_sf <- combine_size_factors_and_offset(offset, size_factors, Y, verbose = verbose, offset_as_vec = perf_optim[["offset_as_vec"]])

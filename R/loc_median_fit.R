@@ -18,7 +18,7 @@
 #' called by the user.
 #'
 #'
-#' @seealso `locfit`: a package dedicated to local regression.
+#' @seealso [`locfit`](https://cran.r-project.org/package=locfit): a package dedicated to local regression.
 #'
 #' @examples
 #'   x <- runif(n = 1000, max = 4)
