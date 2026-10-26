@@ -259,6 +259,10 @@ handle_Mu_rowmeans <- local({
 
 
 handle_sub_param <- function(check.against, sub.param) {
+  if (is.numeric(sub.param) && !is.integer(sub.param)) {
+    stop("indexing parameter must be an integer value")
+  }
+
   if (is.integer(check.against) && (length(check.against) == 1)) {
     if (is.integer(sub.param)) {
       stopifnot(all((sub.param > 0) & (sub.param <= check.against)))
