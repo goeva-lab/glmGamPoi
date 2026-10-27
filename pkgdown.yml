@@ -1,0 +1,8 @@
+pandoc: '3.11'
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  glmGamPoi: glmGamPoi.html
+  perf_optim: perf_optim.html
+  pseudobulk: pseudobulk.html
+last_built: 2026-10-27T01:44Z
