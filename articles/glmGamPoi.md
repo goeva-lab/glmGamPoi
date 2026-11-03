@@ -1,0 +1,294 @@
+# glmGamPoi Quickstart
+
+> Fit Gamma-Poisson Generalized Linear Models Reliably.
+
+The core design aims of `gmlGamPoi` are:
+
+- Fit the Gamma-Poisson models on arbitrarily large or small datasets
+- Be faster than alternative methods, such as `DESeq2` or `edgeR`
+- Calculate exact or approximate results based on user preference
+- Support in memory or on-disk data
+- Follow established conventions around tools for RNA-seq analysis
+- Present a simple user-interface
+- Avoid unnecessary dependencies
+- Make integration into other tools easy
+
+## Example
+
+Load the glmGamPoi2 package
+
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`glmGamPoi2`](https://github.com/goeva-lab/glmGamPoi)`)`
+
+To fit a single Gamma-Poisson GLM do:
+
+\
+`# overdispersion = 1/size`\
+`counts`` ``<-`` `[`rnbinom`](https://rdrr.io/r/stats/NegBinomial.html)`(``n ``=`` ``10``, mu ``=`` ``5``, size ``=`` ``1`` ``/`` ``0.7``)`\
+\
+`# design = ~ 1 means that an intercept-only model is fit`\
+`fit`` ``<-`` `[`glm_gp`](../reference/glm_gp.md)`(``counts``, design ``=`` ``~``1``)`\
+`fit`\
+\
+`# Internally fit is just a list:`\
+[`as.list`](https://rdrr.io/r/base/list.html)`(``fit``)``[``1``:``2``]`
+
+The [`glm_gp()`](../reference/glm_gp.md) function returns a list with
+the results of the fit. Most importantly, it contains the estimates for
+the coefficients β and the overdispersion.
+
+Fitting repeated Gamma-Poisson GLMs for each gene of a single cell
+dataset is just as easy:
+
+I will first load an example dataset using the `TENxPBMCData` package.
+The dataset has 33,000 genes and 4340 cells. It takes roughly 1.5
+minutes to fit the Gamma-Poisson model on the full dataset. For
+demonstration purposes, I will subset the dataset to 300 genes, but keep
+the 4340 cells:
+
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`SummarizedExperiment`](https://bioconductor.org/packages/SummarizedExperiment)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`DelayedMatrixStats`](https://github.com/PeteHaitch/DelayedMatrixStats)`)`
+
+\
+`# The full dataset with 33,000 genes and 4340 cells`\
+`# The first time this is run, it will download the data`\
+`pbmcs`` ``<-`` ``TENxPBMCData``::`[`TENxPBMCData`](https://rdrr.io/pkg/TENxPBMCData/man/TENxPBMCData.html)`(``"pbmc4k"``)`\
+\
+`# I want genes where at least some counts are non-zero`\
+`non_empty_rows`` ``<-`` `[`which`](https://rdrr.io/r/base/which.html)`(``rowSums2``(`[`assay`](https://rdrr.io/pkg/SummarizedExperiment/man/SummarizedExperiment-class.html)`(``pbmcs``)``)`` ``>`` ``0``)`\
+`pbmcs_subset`` ``<-`` ``pbmcs``[`[`sample`](https://rdrr.io/r/base/sample.html)`(``non_empty_rows``, ``300``)``, ``]`\
+`pbmcs_subset`
+
+I call [`glm_gp()`](../reference/glm_gp.md) to fit one GLM model for
+each gene and force the calculation to happen in memory.
+
+\
+`fit`` ``<-`` `[`glm_gp`](../reference/glm_gp.md)`(``pbmcs_subset``, on_disk ``=`` ``FALSE``)`\
+[`summary`](https://rdrr.io/r/base/summary.html)`(``fit``)`
+
+## Benchmark
+
+I compare my method (in-memory and on-disk) with
+*[DESeq2](https://bioconductor.org/packages/3.23/DESeq2)* and
+*[edgeR](https://bioconductor.org/packages/3.23/edgeR)*. Both are
+classical methods for analyzing RNA-Seq datasets and have been around
+for almost 10 years. Note that both tools can do a lot more than just
+fitting the Gamma-Poisson model, so this benchmark only serves to give a
+general impression of the performance.
+
+\
+`# Explicitly realize count matrix in memory so that it is a fair comparison`\
+`pbmcs_subset`` ``<-`` `[`as.matrix`](https://rdrr.io/r/base/matrix.html)`(`[`assay`](https://rdrr.io/pkg/SummarizedExperiment/man/SummarizedExperiment-class.html)`(``pbmcs_subset``)``)`\
+`model_matrix`` ``<-`` `[`matrix`](https://rdrr.io/r/base/matrix.html)`(``1``, nrow ``=`` `[`ncol`](https://rdrr.io/r/base/nrow.html)`(``pbmcs_subset``)``)`\
+\
+\
+`bench``::`[`mark`](https://bench.r-lib.org/reference/mark.html)`(`\
+`  glmGamPoi_in_memory ``=`` ``{`\
+`    `[`glm_gp`](../reference/glm_gp.md)`(``pbmcs_subset``, design ``=`` ``model_matrix``, on_disk ``=`` ``FALSE``)`\
+`  ``}``, glmGamPoi_on_disk ``=`` ``{`\
+`    `[`glm_gp`](../reference/glm_gp.md)`(``pbmcs_subset``, design ``=`` ``model_matrix``, on_disk ``=`` ``TRUE``)`\
+`  ``}``, DESeq2 ``=`` `[`suppressMessages`](https://rdrr.io/r/base/message.html)`(``{`\
+`    ``dds`` ``<-`` ``DESeq2``::`[`DESeqDataSetFromMatrix`](https://rdrr.io/pkg/DESeq2/man/DESeqDataSet.html)`(``pbmcs_subset``,`\
+`      colData ``=`` `[`data.frame`](https://rdrr.io/r/base/data.frame.html)`(``name ``=`` `[`seq_len`](https://rdrr.io/r/base/seq.html)`(``4340``)``)``,`\
+`      design ``=`` ``~``1`\
+`    ``)`\
+`    ``dds`` ``<-`` ``DESeq2``::``estimateSizeFactors``(``dds``, ``"poscounts"``)`\
+`    ``dds`` ``<-`` ``DESeq2``::``estimateDispersions``(``dds``, quiet ``=`` ``TRUE``)`\
+`    ``dds`` ``<-`` ``DESeq2``::`[`nbinomWaldTest`](https://rdrr.io/pkg/DESeq2/man/nbinomWaldTest.html)`(``dds``, minmu ``=`` ``1e-6``)`\
+`  ``}``)``, edgeR ``=`` ``{`\
+`    ``edgeR_data`` ``<-`` ``edgeR``::`[`DGEList`](https://rdrr.io/pkg/edgeR/man/DGEList.html)`(``pbmcs_subset``)`\
+`    ``edgeR_data`` ``<-`` ``edgeR``::`[`calcNormFactors`](https://rdrr.io/pkg/edgeR/man/calcNormFactors.html)`(``edgeR_data``)`\
+`    ``edgeR_data`` ``<-`` ``edgeR``::`[`estimateDisp`](https://rdrr.io/pkg/edgeR/man/estimateDisp.html)`(``edgeR_data``, ``model_matrix``)`\
+`    ``edgeR_fit`` ``<-`` ``edgeR``::`[`glmFit`](https://rdrr.io/pkg/edgeR/man/glmfit.html)`(``edgeR_data``, design ``=`` ``model_matrix``)`\
+`  ``}``, check ``=`` ``FALSE``, min_iterations ``=`` ``3`\
+`)`
+
+On this dataset, `glmGamPoi` is more than 5 times faster than `edgeR`
+and more than 18 times faster than `DESeq2`. `glmGamPoi` does **not**
+use approximations to achieve this performance increase. The performance
+comes from an optimized algorithm for inferring the overdispersion for
+each gene. It is tuned for datasets typically encountered in single
+RNA-seq with many samples and many small counts, by avoiding duplicate
+calculations.
+
+To demonstrate that the method does not sacrifice accuracy, I compare
+the parameters that each method estimates. The means and β coefficients
+are identical, but that the overdispersion estimates from `glmGamPoi`
+are more reliable:
+
+\
+`# Results with my method`\
+`fit`` ``<-`` `[`glm_gp`](../reference/glm_gp.md)`(``pbmcs_subset``, design ``=`` ``model_matrix``, on_disk ``=`` ``FALSE``)`\
+\
+`# DESeq2`\
+`dds`` ``<-`` ``DESeq2``::`[`DESeqDataSetFromMatrix`](https://rdrr.io/pkg/DESeq2/man/DESeqDataSet.html)`(``pbmcs_subset``,`\
+`  colData ``=`` `[`data.frame`](https://rdrr.io/r/base/data.frame.html)`(``name ``=`` `[`seq_len`](https://rdrr.io/r/base/seq.html)`(``4340``)``)``,`\
+`  design ``=`` ``~``1`\
+`)`\
+[`sizeFactors`](https://rdrr.io/pkg/BiocGenerics/man/dge.html)`(``dds``)`` ``<-`` ``fit``$``size_factors`\
+`dds`` ``<-`` ``DESeq2``::``estimateDispersions``(``dds``, quiet ``=`` ``TRUE``)`\
+`dds`` ``<-`` ``DESeq2``::`[`nbinomWaldTest`](https://rdrr.io/pkg/DESeq2/man/nbinomWaldTest.html)`(``dds``, minmu ``=`` ``1e-6``)`\
+\
+`# edgeR`\
+`edgeR_data`` ``<-`` ``edgeR``::`[`DGEList`](https://rdrr.io/pkg/edgeR/man/DGEList.html)`(``pbmcs_subset``, lib.size ``=`` ``fit``$``size_factors``)`\
+`edgeR_data`` ``<-`` ``edgeR``::`[`estimateDisp`](https://rdrr.io/pkg/edgeR/man/estimateDisp.html)`(``edgeR_data``, ``model_matrix``)`\
+`edgeR_fit`` ``<-`` ``edgeR``::`[`glmFit`](https://rdrr.io/pkg/edgeR/man/glmfit.html)`(``edgeR_data``, design ``=`` ``model_matrix``)`
+
+I am comparing the gene-wise estimates of the coefficients from all
+three methods. Points on the diagonal line are identical. The inferred
+Beta coefficients and gene means agree well between the methods, however
+the overdispersion differs quite a bit. `DESeq2` has problems estimating
+most of the overdispersions and sets them to `1e-8`. `edgeR` only
+approximates the overdispersions which explains the variation around the
+overdispersions calculated with `glmGamPoi`.
+
+## Scalability
+
+The method scales linearly, with the number of rows and columns in the
+dataset. For example: fitting the full `pbmc4k` dataset with subsampling
+on a modern MacBook Pro in-memory takes ~1 minute and on-disk a little
+over 4 minutes. Fitting the `pbmc68k` (17x the size) takes ~73 minutes
+(17x the time) on-disk.
+
+## Differential expression analysis
+
+`glmGamPoi` provides an interface to do quasi-likelihood ratio testing
+to identify differentially expressed genes. To demonstrate this feature,
+we will use the data from [Kang *et al.*
+(2018)](https://www.ncbi.nlm.nih.gov/pubmed/29227470) provided by the
+`MuscData` package. This is a single cell dataset of 8 Lupus patients
+for which 10x droplet-based scRNA-seq was performed before and after
+treatment with interferon beta. The `SingleCellExperiment` object
+conveniently provides the patient id (`ind`), treatment status (`stim`)
+and cell type (`cell`):
+
+\
+`sce`` ``<-`` ``muscData``::`[`Kang18_8vs8`](https://rdrr.io/pkg/muscData/man/Kang18_8vs8.html)`(``)`\
+[`colData`](https://rdrr.io/pkg/SummarizedExperiment/man/SummarizedExperiment-class.html)`(``sce``)`
+
+For demonstration purpose, I will work on a subset of the genes and
+cells:
+
+\
+[`set.seed`](https://rdrr.io/r/base/Random.html)`(``1``)`\
+`# Take highly expressed genes and proper cells:`\
+`sce_subset`` ``<-`` ``sce``[`\
+`  `[`rowSums`](https://rdrr.io/pkg/MatrixGenerics/man/rowSums.html)`(`[`counts`](https://rdrr.io/pkg/BiocGenerics/man/dge.html)`(``sce``)``)`` ``>`` ``100``,`\
+`  `[`sample`](https://rdrr.io/r/base/sample.html)`(`\
+`    `[`which`](https://rdrr.io/r/base/which.html)`(``sce``$``multiplets`` ``==`` ``"singlet"`` ``&`` ``!`[`is.na`](https://rdrr.io/r/base/NA.html)`(``sce``$``cell``)`` ``&`` ``sce``$``cell`` `[`%in%`](https://rdrr.io/r/base/match.html)` `[`c`](https://rdrr.io/r/base/c.html)`(``"CD4 T cells"``, ``"B cells"``, ``"NK cells"``)``)``,`\
+`    ``1000`\
+`  ``)`\
+`]`\
+`# Convert counts to dense matrix`\
+[`counts`](https://rdrr.io/pkg/BiocGenerics/man/dge.html)`(``sce_subset``)`` ``<-`` `[`as.matrix`](https://rdrr.io/r/base/matrix.html)`(`[`counts`](https://rdrr.io/pkg/BiocGenerics/man/dge.html)`(``sce_subset``)``)`\
+`# Remove empty levels because glm_gp() will complain otherwise`\
+`sce_subset``$``cell`` ``<-`` `[`droplevels`](https://rdrr.io/r/base/droplevels.html)`(``sce_subset``$``cell``)`
+
+We will identify which genes in CD4 positive T-cells are changed most by
+the treatment. We will fit a full model including the interaction term
+`stim:cell`. The interaction term will help us identify cell type
+specific responses to the treatment:
+
+\
+`fit`` ``<-`` `[`glm_gp`](../reference/glm_gp.md)`(``sce_subset``,`\
+`  design ``=`` ``~`` ``cell`` ``+`` ``stim`` ``+`` ``stim``:``cell`` ``-`` ``1``,`\
+`  reference_level ``=`` ``"NK cells"`\
+`)`\
+[`summary`](https://rdrr.io/r/base/summary.html)`(``fit``)`
+
+To see how the coefficient of our model are called, we look at the
+`colnames(fit$Beta)`:
+
+\
+[`colnames`](https://rdrr.io/r/base/colnames.html)`(``fit``$``Beta``)`
+
+In our example, we want to find the genes that change specifically in T
+cells. Finding cell type specific responses to a treatment is a big
+advantage of single cell data over bulk data. To get a proper estimate
+of the uncertainty (cells from the same donor are **not** independent
+replicates), we create a pseudobulk for each sample:
+
+\
+`# The contrast argument specifies what we want to compare`\
+`# We test the expression difference of stimulated and control T-cells`\
+`#`\
+`# There is no sample label in the colData, so we create it on the fly`\
+`` # from `stim` and `ind` columns in colData(fit$data). ``\
+`de_res`` ``<-`` `[`test_de`](../reference/test_de.md)`(``fit``,`\
+`  contrast ``=`` ``` `stimstim` ``` ``+`` ``` `cellCD4 T cells:stimstim` ```,`\
+`  pseudobulk_by ``=`` `[`paste0`](https://rdrr.io/r/base/paste.html)`(``stim``, ``"-"``, ``ind``)`\
+`)`\
+\
+`` # The large `lfc` values come from groups were nearly all counts are 0 ``\
+`# Setting them to Inf makes the plots look nicer`\
+`de_res``$``lfc`` ``<-`` `[`ifelse`](https://rdrr.io/r/base/ifelse.html)`(`[`abs`](https://rdrr.io/r/base/MathFun.html)`(``de_res``$``lfc``)`` ``>`` ``20``, `[`sign`](https://rdrr.io/r/base/sign.html)`(``de_res``$``lfc``)`` ``*`` ``Inf``, ``de_res``$``lfc``)`\
+\
+`# Most different genes`\
+[`head`](https://rdrr.io/r/utils/head.html)`(``de_res``[`[`order`](https://rdrr.io/r/base/order.html)`(``de_res``$``pval``)``, ``]``)`
+
+The test is successful and we identify interesting genes that are
+differentially expressed in interferon-stimulated T cells: *IFI6*,
+*IFIT3*, and *IRF7* literally stand for *Interferon Induced/Regulated
+Protein*.
+
+To get a more complete overview of the results, we can make a volcano
+plot that compares the log2-fold change (LFC) vs the logarithmized
+p-values.
+
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`ggplot2`](https://ggplot2.tidyverse.org)`)`\
+[`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)`(``de_res``, `[`aes`](https://ggplot2.tidyverse.org/reference/aes.html)`(``x ``=`` ``lfc``, y ``=`` ``-`[`log10`](https://rdrr.io/r/base/Log.html)`(``pval``)``)``)`` ``+`\
+`  `[`geom_point`](https://ggplot2.tidyverse.org/reference/geom_point.html)`(``size ``=`` ``0.6``, `[`aes`](https://ggplot2.tidyverse.org/reference/aes.html)`(``color ``=`` ``adj_pval`` ``<`` ``0.1``)``)`` ``+`\
+`  `[`ggtitle`](https://ggplot2.tidyverse.org/reference/labs.html)`(``"Volcano Plot"``, ``"Genes that change most through interferon-beta treatment in T cells"``)`
+
+Another important task in single cell data analysis is the
+identification of marker genes for cell clusters. For this we can also
+use our Gamma-Poisson fit.
+
+Let’s assume we want to find genes that differ between T cells and the B
+cells. We can directly compare the corresponding coefficients and find
+genes that differ in the control condition:
+
+\
+`marker_genes`` ``<-`` `[`test_de`](../reference/test_de.md)`(``fit``, ``` `cellCD4 T cells` ``` ``-`` ``` `cellB cells` ```, sort_by ``=`` ``pval``)`\
+[`head`](https://rdrr.io/r/utils/head.html)`(``marker_genes``)`
+
+If we want find genes that differ in the stimulated condition, we just
+include the additional coefficients in the contrast:
+
+\
+`marker_genes2`` ``<-`` `[`test_de`](../reference/test_de.md)`(``fit``, ``(``` `cellCD4 T cells` ``` ``+`` ``` `cellCD4 T cells:stimstim` ```)`` ``-`` ``(``` `cellB cells` ``` ``+`` ``` `cellB cells:stimstim` ```)``, sort_by ``=`` ``pval``)`\
+\
+[`head`](https://rdrr.io/r/utils/head.html)`(``marker_genes2``)`
+
+We identify many genes related to the human leukocyte antigen (HLA)
+system that is important for antigen presenting cells like B-cells, but
+are not expressed by T helper cells. The plot below shows the expression
+differences.
+
+A note of caution: applying [`test_de()`](../reference/test_de.md) to
+single cell data without the pseudobulk gives overly optimistic
+p-values. This is due to the fact that cells from the same sample are
+not independent replicates! It can still be fine to use the method for
+identifying marker genes, as long as one is aware of the difficulties
+interpreting the results.
+
+\
+`# Create a data.frame with the expression values, gene names, and cell types`\
+`tmp`` ``<-`` `[`data.frame`](https://rdrr.io/r/base/data.frame.html)`(`\
+`  gene ``=`` `[`rep`](https://rdrr.io/r/base/rep.html)`(``marker_genes``$``name``[``1``:``6``]``, times ``=`` `[`ncol`](https://rdrr.io/r/base/nrow.html)`(``sce_subset``)``)``,`\
+`  expression ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(`[`counts`](https://rdrr.io/pkg/BiocGenerics/man/dge.html)`(``sce_subset``)``[``marker_genes``$``name``[``1``:``6``]``, ``]``)``,`\
+`  celltype ``=`` `[`rep`](https://rdrr.io/r/base/rep.html)`(``sce_subset``$``cell``, each ``=`` ``6``)`\
+`)`\
+\
+[`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)`(``tmp``, `[`aes`](https://ggplot2.tidyverse.org/reference/aes.html)`(``x ``=`` ``celltype``, y ``=`` ``expression``)``)`` ``+`\
+`  `[`geom_jitter`](https://ggplot2.tidyverse.org/reference/geom_jitter.html)`(``height ``=`` ``0.1``)`` ``+`\
+`  `[`stat_summary`](https://ggplot2.tidyverse.org/reference/stat_summary.html)`(``geom ``=`` ``"crossbar"``, fun ``=`` ``"mean"``, color ``=`` ``"red"``)`` ``+`\
+`  `[`facet_wrap`](https://ggplot2.tidyverse.org/reference/facet_wrap.html)`(``~``gene``, scales ``=`` ``"free_y"``)`` ``+`\
+`  `[`ggtitle`](https://ggplot2.tidyverse.org/reference/labs.html)`(``"Marker genes of B vs. T cells"``)`
+
+## Session Info
+
+\
+[`sessionInfo`](https://rdrr.io/r/utils/sessionInfo.html)`(``)`
